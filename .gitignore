@@ -1,0 +1,27 @@
+## .gitignore for WinUI 3 / .NET Desktop project
+
+# Build outputs
+bin/
+obj/
+*.dll
+*.pdb
+*.exe
+*.log
+
+# Visual Studio
+.vs/
+*.user
+*.suo
+*.userprefs
+*.sln.docstates
+
+# Rider
+.idea/
+*.sln.iml
+
+# macOS
+.DS_Store
+
+# Rust artifacts (if wdmm-ffi is built in sibling)
+**/target/
+Cargo.lock
