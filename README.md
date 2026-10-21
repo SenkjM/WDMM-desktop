@@ -133,14 +133,29 @@ start WdmmDesktop.sln
 
 **Run**: `F5` (Debug) or `Ctrl+F5` (Release without debugger).
 
-### 6. Smoke Test
+### 6. Smoke Test Checklist
 
-- Window should launch with title "WDMM Desktop".
-- Status text should show "Ready (FFI not yet hooked)" or "WDMM Core v0.1.0" if FFI is connected.
-- Settings stub displays: Bind Mode dropdown, Port textbox, Token display (read-only).
-- "Start / Stop" button shows alert "OpenAPI toggle not yet implemented".
+Run through this checklist after building:
 
-✅ **Smoke passed** = window launches without crash; UI renders correctly.
+- [ ] Project opens in Visual Studio 2022 without errors
+- [ ] Solution builds successfully (Ctrl+Shift+B)
+- [ ] Window launches with title "WDMM Desktop" (F5)
+- [ ] Status text shows "Ready (FFI not yet hooked)" or "WDMM Core v0.1.0" if FFI is connected
+- [ ] Settings UI renders: Bind Mode dropdown, Port textbox, Token display (read-only)
+- [ ] "Start / Stop" button shows alert "OpenAPI toggle not yet implemented"
+- [ ] No runtime crashes or exceptions in Output window
+- [ ] `Generated/NativeMethods.g.cs` exists and matches wdmm-ffi exports (version, hello, openapi_status)
+
+✅ **Smoke passed** = all items checked; window launches without crash and UI renders correctly.
+
+**FFI smoke test** (if wdmm_ffi.dll is in output directory):
+```csharp
+var version = NativeMethods.wdmm_version();
+var versionStr = Marshal.PtrToStringAnsi(version.ptr);
+Console.WriteLine($"WDMM Core version: {versionStr}");
+NativeMethods.wdmm_ffi_free_string(version);
+```
+Expected output: `WDMM Core version: 0.1.0`
 
 ---
 
