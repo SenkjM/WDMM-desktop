@@ -226,6 +226,45 @@ namespace WdmmDesktop.Generated
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
         public static extern FfiString wdmm_library_import_from_sqflite(IntPtr oldDbPath);
 
+        // ── Local HTTP proxy (proxy extract round) ───────────────────────────
+
+        /// <summary>
+        /// Start the local HTTP proxy on 127.0.0.1 at the given port (0 = OS-assigned).
+        /// Returns the bound port as a decimal string, or "error:…".
+        /// No-op if already running (returns existing port). Caller must free.
+        /// </summary>
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern FfiString wdmm_proxy_start(ushort port);
+
+        /// <summary>Stop the local HTTP proxy. No-op if not running. Returns "ok".</summary>
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern FfiString wdmm_proxy_stop();
+
+        /// <summary>Returns the bound proxy port, or -1 if not running.</summary>
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern int wdmm_proxy_port();
+
+        /// <summary>
+        /// Register a local file with the proxy.
+        /// <paramref name="filePath"/> — absolute local path (null-terminated UTF-8).
+        /// <paramref name="name"/>     — optional display name for Content-Type
+        ///   guessing (e.g. "movie.mp4"); pass IntPtr.Zero to omit.
+        /// Returns JSON: {"token":"…","path_template":"/s/…","port":N}
+        /// or "error:…". Caller must free.
+        /// Build the URL as http://127.0.0.1:{port}{path_template}.
+        /// </summary>
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern FfiString wdmm_proxy_register_file(
+            IntPtr filePath,
+            IntPtr name);
+
+        /// <summary>
+        /// Unregister a proxy token. Returns "ok".
+        /// <paramref name="token"/> must be a null-terminated UTF-8 string.
+        /// </summary>
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern FfiString wdmm_proxy_unregister(IntPtr token);
+
         // ── Helper extensions ─────────────────────────────────────────────────
 
         /// <summary>
@@ -284,6 +323,51 @@ namespace WdmmDesktop.Generated
 
         public static string DlnaDiscoverJson(uint timeoutMs = 2000)
             => wdmm_dlna_discover_json(timeoutMs).ToStringAndFree();
+
+        // ── Local HTTP proxy (proxy extract round) ─────────────────────────
+
+        /// <summary>Start the local proxy on 127.0.0.1 (port 0 = OS-assigned). Returns the port or "error:…".</summary>
+        public static string ProxyStart(ushort port = 0)
+            => wdmm_proxy_start(port).ToStringAndFree();
+
+        /// <summary>Stop the local proxy. Returns "ok".</summary>
+        public static void ProxyStop()
+            => wdmm_proxy_stop().ToStringAndFree();
+
+        /// <summary>Bound proxy port, or -1 if not running.</summary>
+        public static int ProxyPort()
+            => wdmm_proxy_port();
+
+        /// <summary>
+        /// Register a local file with the proxy. Returns JSON
+        /// {"token":"…","path_template":"/s/…","port":N}. Build the URL as
+        /// http://127.0.0.1:{port}{path_template}.
+        /// </summary>
+        public static string ProxyRegisterFile(string filePath, string? name = null)
+        {
+            // name may be null → IntPtr.Zero
+            byte[]? nameBytes = name is null
+                ? null
+                : System.Text.Encoding.UTF8.GetBytes(name + '\0');
+            IntPtr namePtr = nameBytes is null
+                ? IntPtr.Zero
+                : Marshal.AllocHGlobal(nameBytes.Length);
+            try
+            {
+                if (nameBytes is not null)
+                    Marshal.Copy(nameBytes, 0, namePtr, nameBytes.Length);
+                return WithNativeString(filePath, p => wdmm_proxy_register_file(p, namePtr));
+            }
+            finally
+            {
+                if (namePtr != IntPtr.Zero)
+                    Marshal.FreeHGlobal(namePtr);
+            }
+        }
+
+        /// <summary>Unregister a proxy token. Returns "ok".</summary>
+        public static string ProxyUnregister(string token)
+            => WithNativeString(token, wdmm_proxy_unregister);
 
         // ── Library convenience wrappers (Round 5/6) ──────────────────────────
 
