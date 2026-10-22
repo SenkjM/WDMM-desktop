@@ -54,6 +54,15 @@ namespace WdmmDesktop.Generated
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
         public static extern FfiString wdmm_queue_cancel(IntPtr taskId);
 
+        /// <summary>
+        /// Enqueue a download/sync task from a JSON object string.
+        /// Expected JSON: {"id":"...","kind":"download_track","remote_path":"/...","total_bytes":N}
+        /// Returns "ok" or "error:…". Caller must free the result.
+        /// (Round 7 — gated by kRustQueueEnabled on the Dart side.)
+        /// </summary>
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern FfiString wdmm_queue_enqueue(IntPtr json);
+
         /// <summary>Return the number of pending queue tasks.</summary>
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
         public static extern int wdmm_queue_pending_count();
@@ -259,6 +268,13 @@ namespace WdmmDesktop.Generated
 
         public static string QueueStatusJson()
             => wdmm_queue_status_json().ToStringAndFree();
+
+        /// <summary>
+        /// Enqueue a download/sync task from a JSON string (Round 7).
+        /// Returns "ok" or "error:…".
+        /// </summary>
+        public static string QueueEnqueue(string taskJson)
+            => WithNativeString(taskJson, wdmm_queue_enqueue);
 
         public static string TokenGet()
             => wdmm_token_get().ToStringAndFree();
