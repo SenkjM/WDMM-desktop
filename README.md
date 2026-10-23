@@ -33,29 +33,33 @@ WdmmDesktop/
 
 ## Build Instructions
 
-### 1. Clone Sibling Repos
+### 1. Clone + Initialise Submodule
 
 ```bash
-cd /your/projects
 git clone https://github.com/SenkjM/WDMM-desktop.git
-git clone https://github.com/SenkjM/WDMM-core.git
+cd WDMM-desktop
+git submodule update --init rust/wdmm-core
 ```
 
-Expected layout:
+WDMM-core is a **git submodule** at `rust/wdmm-core` (relative to repo root).
+Expected layout after initialisation:
+
 ```
-/your/projects/
-├── WDMM-core/
-└── WDMM-desktop/
+WDMM-desktop/
+├── WdmmDesktop/
+├── rust/
+│   └── wdmm-core/   ← git submodule → https://github.com/SenkjM/WDMM-core.git
+└── WdmmDesktop.sln
 ```
 
 ### 2. Build Rust Core + Generate FFI Bindings
 
 ```bash
-cd ../WDMM-core
+cd rust/wdmm-core
 cargo build --release --package wdmm-ffi
 ```
 
-This produces `target/release/wdmm_ffi.dll` (and `.lib` for linking).
+This produces `rust/wdmm-core/target/release/wdmm_ffi.dll` (and `.lib` for linking).
 
 ### 3. Generate C# Bindings with csbindgen
 
@@ -68,8 +72,8 @@ cargo install csbindgen
 Generate bindings:
 
 ```bash
-csbindgen --input target/release/wdmm_ffi.dll \
-          --output ../WDMM-desktop/WdmmDesktop/Generated/NativeMethods.g.cs \
+csbindgen --input rust/wdmm-core/target/release/wdmm_ffi.dll \
+          --output WdmmDesktop/Generated/NativeMethods.g.cs \
           --namespace WdmmDesktop.Generated
 ```
 
@@ -110,12 +114,12 @@ namespace WdmmDesktop.Generated
 
 Place `wdmm_ffi.dll` in the same directory as the built `.exe` so the runtime can find it:
 
-- **Option A** (manual): copy `../WDMM-core/target/release/wdmm_ffi.dll` to `WdmmDesktop/bin/x64/Debug/` after each Rust rebuild.
+- **Option A** (manual): copy `rust/wdmm-core/target/release/wdmm_ffi.dll` to `WdmmDesktop/bin/x64/Debug/` after each Rust rebuild.
 - **Option B** (MSBuild post-build event): add to `.csproj`:
 
 ```xml
 <Target Name="CopyRustDll" AfterTargets="Build">
-  <Copy SourceFiles="$(SolutionDir)..\..\WDMM-core\target\release\wdmm_ffi.dll"
+  <Copy SourceFiles="$(SolutionDir)rust\wdmm-core\target\release\wdmm_ffi.dll"
         DestinationFolder="$(OutDir)" />
 </Target>
 ```
@@ -172,7 +176,7 @@ C# P/Invoke searches:
 
 ```xml
 <ItemGroup>
-  <Content Include="..\..\..\WDMM-core\target\release\wdmm_ffi.dll">
+  <Content Include="$(SolutionDir)rust\wdmm-core\target\release\wdmm_ffi.dll">
     <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
   </Content>
 </ItemGroup>
@@ -224,7 +228,7 @@ If Rust cross-compile to `x86_64-pc-windows-msvc` isn't available in your enviro
 ## References
 
 - **Rust Core**: [WDMM-core](https://github.com/SenkjM/WDMM-core)
-- **Constraints**: `../WDMM-core/docs/CONSTRAINTS.md`
+- **Constraints**: `rust/wdmm-core/docs/CONSTRAINTS.md`
 - **Brief**: `/workspace/saf_work/wdmm-split-impl-brief.md §B`
 - **csbindgen**: https://github.com/Cysharp/csbindgen
 - **Windows App SDK Docs**: https://learn.microsoft.com/windows/apps/windows-app-sdk/

@@ -34,7 +34,13 @@
   </ItemGroup>
 
   <!--
-    FFI: Reference wdmm-ffi from WDMM-core (sibling or submodule).
+    FFI: wdmm-ffi is built from the git submodule at rust/wdmm-core (repo-root-relative).
+    DLL output: rust/wdmm-core/target/release/wdmm_ffi.dll
+    CopyRustDll target (optional, see README §4):
+      SourceFiles="$(SolutionDir)rust\wdmm-core\target\release\wdmm_ffi.dll"
+    Content include for MSIX packaging (optional, see README §FFI Hookup Notes):
+      Include="$(SolutionDir)rust\wdmm-core\target\release\wdmm_ffi.dll"
     csbindgen-generated bindings go in Generated/NativeMethods.g.cs (see README).
+    Initialise submodule: git submodule update --init rust/wdmm-core
   -->
 </Project>
