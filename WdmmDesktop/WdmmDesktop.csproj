@@ -12,6 +12,9 @@
     <UseWinUI>true</UseWinUI>
     <EnableMsixTooling>true</EnableMsixTooling>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+      <!-- Unpackaged WinUI: avoid REGDB_E_CLASSNOTREG on Application.Start -->
+    <WindowsPackageType>None</WindowsPackageType>
+    <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
   </PropertyGroup>
 
   <ItemGroup>
@@ -20,7 +23,7 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.26100.1742" />
-    <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.6.250924000" />
+    <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.7.250310001" />
     <Manifest Include="$(ApplicationManifest)" />
   </ItemGroup>
 
@@ -41,6 +44,6 @@
     Content include for MSIX packaging (optional, see README §FFI Hookup Notes):
       Include="$(SolutionDir)rust\wdmm-core\target\release\wdmm_ffi.dll"
     csbindgen-generated bindings go in Generated/NativeMethods.g.cs (see README).
-    Initialise submodule: git submodule update --init rust/wdmm-core
+    Initialise submodule: git submodule update (init) rust/wdmm-core
   -->
 </Project>
