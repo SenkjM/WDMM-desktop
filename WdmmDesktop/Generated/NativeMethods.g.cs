@@ -298,7 +298,7 @@ namespace WdmmDesktop.Generated
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
         public static extern FfiString wdmm_proxy_hls_seek(IntPtr token, double offsetSecs);
 
-        // ── Proxy stream (LocalStream / MustProxy — wdmm-core e236ece) ──────────
+        // ── Proxy stream (LocalStream / MustProxy — wdmm-core e236ece + b08a5ef) ──
         // Used for ContentDeliveryKind.LocalStream (crypt, streaming-only drivers).
         // Desktop has no cloud/crypt drivers today; CastPage has an explicit hook
         // that returns NotSupported until a real stream source exists.
@@ -307,13 +307,18 @@ namespace WdmmDesktop.Generated
         /// <summary>
         /// Range callback: supplies bytes [start, end] on demand from a Tokio worker
         /// thread. Must be thread-safe for the lifetime of the registration.
-        /// Allocate *outBuf via <see cref="wdmm_proxy_stream_alloc_buf"/>; Rust
-        /// reclaims it after consuming. Return 0 on success, negative on error.
+        ///
+        /// Sync path: allocate *outBuf via <see cref="wdmm_proxy_stream_alloc_buf"/>;
+        /// Rust reclaims it after consuming. Return 0.
+        /// Async path: return 0 with *outBuf left null, then call
+        /// <see cref="wdmm_proxy_stream_set_result"/> with <paramref name="requestId"/>.
+        /// Return negative for an immediate error.
         /// </summary>
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate int WdmmProxyRangeCallback(
             IntPtr userData, long start, long end,
-            out IntPtr outBuf, out nuint outLen);
+            out IntPtr outBuf, out nuint outLen,
+            ulong requestId); // NEW (core b08a5ef) — async reply channel id
 
         /// <summary>
         /// Allocate <paramref name="len"/> bytes on Rust's heap for a callback
@@ -325,6 +330,26 @@ namespace WdmmDesktop.Generated
         /// <summary>Free a buffer from wdmm_proxy_stream_alloc_buf. No-op if null/zero.</summary>
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
         public static extern void wdmm_proxy_stream_free_buf(IntPtr buf, nuint len);
+
+        /// <summary>
+        /// Deliver async Range bytes to a parked proxy worker thread (core b08a5ef).
+        /// Safe to call from any thread.
+        /// <para>
+        /// <paramref name="requestId"/> — id received on the WdmmProxyRangeCallback.<br/>
+        /// <paramref name="buf"/> — Rust-heap buffer from
+        /// <see cref="wdmm_proxy_stream_alloc_buf"/>; Rust takes ownership on the
+        /// success path (<paramref name="status"/> == 0). Pass <see cref="IntPtr.Zero"/>
+        /// on the error path.<br/>
+        /// <paramref name="len"/> — byte count in <paramref name="buf"/> (ignored when
+        /// status &lt; 0).<br/>
+        /// <paramref name="status"/> — 0 = success; negative = error.
+        /// </para>
+        /// No-op (and safe) if <paramref name="requestId"/> is unknown (timed out or
+        /// already used — orphaned buffer is freed by Rust).
+        /// </summary>
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern void wdmm_proxy_stream_set_result(
+            ulong requestId, IntPtr buf, nuint len, int status);
 
         /// <summary>
         /// Register an in-process Range/byte stream with the proxy.
@@ -572,6 +597,33 @@ namespace WdmmDesktop.Generated
             var ptr   = Marshal.AllocHGlobal(bytes.Length);
             try   { Marshal.Copy(bytes, 0, ptr, bytes.Length); return wdmm_proxy_renew_stream_callback(ptr, cb, userData).ToStringAndFree(); }
             finally { Marshal.FreeHGlobal(ptr); }
+        }
+
+        /// <summary>
+        /// Deliver async Range bytes to a parked proxy worker thread (core b08a5ef).
+        /// Allocates a Rust-heap buffer, copies <paramref name="bytes"/> into it, and
+        /// calls <see cref="wdmm_proxy_stream_set_result"/> with status 0.
+        /// On the error path (null/empty bytes or status &lt; 0), signals the error
+        /// without allocating a buffer.
+        /// Safe to call from any thread.
+        /// </summary>
+        public static void ProxyStreamSetResult(ulong requestId, byte[]? bytes, int status = 0)
+        {
+            if (status == 0 && bytes is { Length: > 0 })
+            {
+                IntPtr buf = wdmm_proxy_stream_alloc_buf((nuint)bytes.Length);
+                if (buf == IntPtr.Zero)
+                {
+                    wdmm_proxy_stream_set_result(requestId, IntPtr.Zero, 0, -1);
+                    return;
+                }
+                Marshal.Copy(bytes, 0, buf, bytes.Length);
+                wdmm_proxy_stream_set_result(requestId, buf, (nuint)bytes.Length, 0);
+            }
+            else
+            {
+                wdmm_proxy_stream_set_result(requestId, IntPtr.Zero, 0, status < 0 ? status : -1);
+            }
         }
     }
 }
