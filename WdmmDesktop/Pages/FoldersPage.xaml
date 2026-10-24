@@ -13,81 +13,129 @@
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <!-- Path bar -->
-        <Grid Grid.Row="0" Margin="12,10,12,6">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="Auto" />
-            </Grid.ColumnDefinitions>
+        <!-- Source picker: Local / Remote -->
+        <StackPanel Grid.Row="0"
+                    Orientation="Horizontal"
+                    Spacing="8"
+                    Margin="12,10,12,6">
+            <ToggleSwitch x:Name="SourceToggle"
+                          OnContent="Remote (WebDAV)"
+                          OffContent="Local"
+                          Toggled="SourceToggle_Toggled"
+                          MinWidth="0" />
+        </StackPanel>
 
-            <Button x:Name="UpBtn"
-                    Grid.Column="0"
-                    Click="UpBtn_Click"
-                    IsEnabled="False"
-                    ToolTipService.ToolTip="Go to parent folder"
-                    Margin="0,0,6,0"
-                    Padding="10,8">
-                <FontIcon Glyph="&#xE74A;" FontSize="14" />
-            </Button>
+        <!-- Outer row-1 container holds either the blocked bar OR the local grid.
+             Grid is needed so both children can share Grid.Row="1" — only one
+             is ever Visible at a time. -->
+        <Grid Grid.Row="1">
 
-            <TextBox x:Name="PathBox"
-                     Grid.Column="1"
-                     PlaceholderText="Enter a path or click Browse…"
-                     VerticalAlignment="Center"
-                     KeyDown="PathBox_KeyDown" />
+            <!-- Remote WebDAV blocked bar (visible in Remote mode; hidden in Local mode) -->
+            <InfoBar x:Name="RemoteBlockedBar"
+                     IsOpen="False"
+                     IsClosable="False"
+                     Severity="Error"
+                     Title="Remote browse unavailable"
+                     Message="Blocked: wdmm_webdav_list not exported in wdmm-core @ d8b2217. Use Network → Sync, then browse local library paths."
+                     VerticalAlignment="Top"
+                     Margin="12,6,12,0"
+                     Visibility="Collapsed" />
 
-            <Button x:Name="BrowseBtn"
-                    Grid.Column="2"
-                    Content="Browse…"
-                    Click="BrowseBtn_Click"
-                    Margin="6,0,0,0"
-                    Padding="12,8" />
+            <!-- Local browser (hidden in Remote mode) -->
+            <Grid x:Name="LocalGrid">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+
+                <!-- Path bar -->
+                <Grid Grid.Row="0" Margin="12,6,12,6">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <Button x:Name="UpBtn"
+                            Grid.Column="0"
+                            Click="UpBtn_Click"
+                            IsEnabled="False"
+                            ToolTipService.ToolTip="Go to parent folder"
+                            Margin="0,0,6,0"
+                            Padding="10,8">
+                        <FontIcon Glyph="&#xE74A;" FontSize="14" />
+                    </Button>
+
+                    <TextBox x:Name="PathBox"
+                             Grid.Column="1"
+                             PlaceholderText="Enter a path or click Browse…"
+                             VerticalAlignment="Center"
+                             KeyDown="PathBox_KeyDown" />
+
+                    <Button x:Name="BrowseBtn"
+                            Grid.Column="2"
+                            Content="Browse…"
+                            Click="BrowseBtn_Click"
+                            Margin="6,0,0,0"
+                            Padding="12,8" />
+                </Grid>
+
+                <!-- File/folder list + empty state layer -->
+                <Grid Grid.Row="1">
+                    <ListView x:Name="ItemsList"
+                              Margin="12,0,12,0"
+                              SelectionMode="Single"
+                              DoubleTapped="ItemsList_DoubleTapped">
+                        <ListView.ItemTemplate>
+                            <DataTemplate>
+                                <Grid Padding="4,6" ColumnSpacing="10">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <FontIcon Grid.Column="0"
+                                              Glyph="{Binding IconGlyph}"
+                                              FontSize="16"
+                                              Opacity="0.7" />
+                                    <TextBlock Grid.Column="1"
+                                               Text="{Binding Name}"
+                                               VerticalAlignment="Center"
+                                               TextTrimming="CharacterEllipsis" />
+                                    <TextBlock Grid.Column="2"
+                                               Text="{Binding Meta}"
+                                               FontSize="11"
+                                               Opacity="0.5"
+                                               VerticalAlignment="Center" />
+                                </Grid>
+                            </DataTemplate>
+                        </ListView.ItemTemplate>
+                    </ListView>
+
+                    <!-- Empty folder / access-denied / path-not-found state -->
+                    <StackPanel x:Name="EmptyState"
+                                VerticalAlignment="Center"
+                                HorizontalAlignment="Center"
+                                Spacing="8"
+                                Visibility="Collapsed">
+                        <FontIcon Glyph="&#xE7B7;" FontSize="40" Opacity="0.3" />
+                        <TextBlock x:Name="EmptyText"
+                                   FontSize="13"
+                                   Opacity="0.5"
+                                   HorizontalAlignment="Center"
+                                   TextWrapping="Wrap"
+                                   MaxWidth="320"
+                                   TextAlignment="Center" />
+                    </StackPanel>
+                </Grid>
+            </Grid>
         </Grid>
 
-        <!-- File/folder list -->
-        <ListView x:Name="ItemsList"
-                  Grid.Row="1"
-                  Margin="12,0,12,0"
-                  SelectionMode="Single"
-                  DoubleTapped="ItemsList_DoubleTapped">
-            <ListView.ItemTemplate>
-                <DataTemplate>
-                    <Grid Padding="4,6" ColumnSpacing="10">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <FontIcon Grid.Column="0"
-                                  Glyph="{Binding IconGlyph}"
-                                  FontSize="16"
-                                  Opacity="0.7" />
-                        <TextBlock Grid.Column="1"
-                                   Text="{Binding Name}"
-                                   VerticalAlignment="Center"
-                                   TextTrimming="CharacterEllipsis" />
-                        <TextBlock Grid.Column="2"
-                                   Text="{Binding Meta}"
-                                   FontSize="11"
-                                   Opacity="0.5"
-                                   VerticalAlignment="Center" />
-                    </Grid>
-                </DataTemplate>
-            </ListView.ItemTemplate>
-        </ListView>
-
-        <!-- WebDAV stub note -->
-        <Border Grid.Row="2"
-                Background="{ThemeResource LayerFillColorDefaultBrush}"
-                Padding="12,8"
-                Margin="12,4,12,12"
-                CornerRadius="6">
-            <TextBlock FontSize="11"
-                       Opacity="0.5"
-                       TextWrapping="Wrap"
-                       FontFamily="Cascadia Mono,Consolas,monospace"
-                       Text="Remote WebDAV browse: TODO — wdmm_webdav_list not yet in FFI. Configure accounts on Network page, then Sync to pull files locally." />
-        </Border>
+        <!-- Status bar -->
+        <TextBlock x:Name="StatusBar"
+                   Grid.Row="2"
+                   Margin="14,4,14,10"
+                   FontSize="11"
+                   Opacity="0.45" />
     </Grid>
 </Page>

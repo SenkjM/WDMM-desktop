@@ -6,22 +6,87 @@
     xmlns:local="using:WdmmDesktop.Pages">
 
     <!-- No Background: Mica shows through -->
-    <StackPanel VerticalAlignment="Center"
-                HorizontalAlignment="Center"
-                Spacing="12">
-        <FontIcon Glyph="&#xE82D;" FontSize="48" Opacity="0.35" />
-        <TextBlock Text="Manga"
-                   FontSize="24"
-                   FontWeight="SemiBold"
-                   HorizontalAlignment="Center" />
-        <TextBlock Text="Not yet available — wdmm_manga_list not in FFI"
-                   FontSize="13"
-                   Opacity="0.5"
-                   HorizontalAlignment="Center" />
-        <TextBlock Text="TODO: wire when wdmm-core exports wdmm_manga_list / wdmm_manga_chapters"
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- Toolbar -->
+        <Grid Grid.Row="0" Margin="12,10,12,6">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <TextBlock Grid.Column="0"
+                       Text="Manga Library"
+                       FontSize="15"
+                       FontWeight="SemiBold"
+                       VerticalAlignment="Center" />
+
+            <!-- Disabled until the API lands -->
+            <Button x:Name="RefreshBtn"
+                    Grid.Column="1"
+                    Click="RefreshBtn_Click"
+                    IsEnabled="False"
+                    ToolTipService.ToolTip="Refresh (unavailable — API not yet wired)"
+                    Padding="10,8">
+                <FontIcon Glyph="&#xE72C;" FontSize="14" />
+            </Button>
+        </Grid>
+
+        <!-- Blocked InfoBar — always open; names the missing APIs explicitly -->
+        <InfoBar Grid.Row="1"
+                 IsOpen="True"
+                 IsClosable="False"
+                 Severity="Informational"
+                 Title="Manga API not available"
+                 Message="Blocked: wdmm_manga_list / chapter APIs not in FFI or OpenAPI @ d8b2217 (storage tables manga_series/manga_chapters exist; no CRUD yet)."
+                 Margin="12,0,12,6" />
+
+        <!-- Series grid placeholder (disabled while API is absent).
+             GridView wraps natively — no Community Toolkit WrapPanel needed. -->
+        <GridView x:Name="SeriesGrid"
+                  Grid.Row="2"
+                  Margin="8,0,8,0"
+                  IsItemClickEnabled="False"
+                  SelectionMode="None"
+                  IsEnabled="False">
+            <GridView.ItemContainerStyle>
+                <Style TargetType="GridViewItem">
+                    <Setter Property="Margin" Value="4" />
+                    <Setter Property="Padding" Value="0" />
+                </Style>
+            </GridView.ItemContainerStyle>
+            <GridView.ItemTemplate>
+                <DataTemplate>
+                    <Border Width="130"
+                            Height="180"
+                            CornerRadius="6"
+                            Background="{ThemeResource LayerFillColorDefaultBrush}">
+                        <StackPanel VerticalAlignment="Bottom" Padding="8,6">
+                            <TextBlock Text="{Binding Title}"
+                                       FontSize="11"
+                                       FontWeight="SemiBold"
+                                       TextTrimming="CharacterEllipsis"
+                                       Opacity="0.45" />
+                            <TextBlock Text="{Binding ChapterHint}"
+                                       FontSize="10"
+                                       Opacity="0.3" />
+                        </StackPanel>
+                    </Border>
+                </DataTemplate>
+            </GridView.ItemTemplate>
+        </GridView>
+
+        <!-- Status bar -->
+        <TextBlock x:Name="StatusBar"
+                   Grid.Row="3"
+                   Margin="14,4,14,10"
                    FontSize="11"
-                   Opacity="0.35"
-                   HorizontalAlignment="Center"
-                   FontFamily="Cascadia Mono,Consolas,monospace" />
-    </StackPanel>
+                   Opacity="0.45" />
+    </Grid>
 </Page>
