@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page
+    x:Class="WdmmDesktop.Pages.ShellPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:WdmmDesktop.Pages">
+
+    <!-- No Background set; Mica shows through -->
+    <Grid>
+        <StackPanel VerticalAlignment="Center"
+                    HorizontalAlignment="Center"
+                    Spacing="12">
+            <FontIcon x:Name="PageIcon"
+                      Glyph="&#xE8B7;"
+                      FontSize="48"
+                      Opacity="0.4" />
+            <TextBlock x:Name="PageTitle"
+                       Text="Folders"
+                       FontSize="24"
+                       FontWeight="SemiBold"
+                       HorizontalAlignment="Center" />
+            <TextBlock Text="Placeholder — implementation pending"
+                       FontSize="13"
+                       Opacity="0.5"
+                       HorizontalAlignment="Center" />
+        </StackPanel>
+    </Grid>
+</Page>
