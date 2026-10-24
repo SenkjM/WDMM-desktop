@@ -61,7 +61,7 @@
             <StackPanel Spacing="6">
                 <TextBlock Text="API Token" FontWeight="SemiBold" FontSize="13" />
                 <TextBox x:Name="TokenBox"
-                         Text="dev-token-placeholder"
+                         Text=""
                          IsReadOnly="True"
                          FontFamily="Cascadia Mono,Consolas,monospace"
                          FontSize="12" />
@@ -70,6 +70,13 @@
                            Opacity="0.6"
                            TextWrapping="Wrap" />
             </StackPanel>
+
+            <!-- Save status / error feedback -->
+            <TextBlock x:Name="SaveStatusText"
+                       FontSize="12"
+                       Foreground="{ThemeResource SystemFillColorCriticalBrush}"
+                       TextWrapping="Wrap"
+                       Visibility="Collapsed" />
 
         </StackPanel>
     </Border>

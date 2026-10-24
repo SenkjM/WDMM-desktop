@@ -32,17 +32,18 @@
 
 ## Destinations
 
-| Destination     | Status        |
-|-----------------|---------------|
-| Folders         | Placeholder   |
-| Music Library   | Placeholder   |
-| Playlists       | Placeholder   |
-| Manga           | Placeholder   |
-| Network Library | Placeholder   |
-| Tasks           | Placeholder   |
-| About           | Placeholder   |
+Mirrors Android HomeShell order. Each destination navigates `ContentFrame` to `ShellPage`,
+which shows the destination-specific Segoe Fluent icon and title.
 
-All destinations navigate the `ContentFrame` to `ShellPage` with the destination name as a parameter.
+| Destination | Icon (Segoe UI MDL2) | Status      |
+|-------------|----------------------|-------------|
+| Folders     | `E8B7` Folder        | Placeholder |
+| Music       | `E8D6` MusicNote     | Placeholder |
+| Playlists   | `E762` SortLines     | Placeholder |
+| Manga       | `E82D` ContactCard   | Placeholder |
+| Network     | `E968` NetworkTower  | Placeholder |
+| Tasks       | `E896` TaskList      | Placeholder |
+| About       | `E946` Info          | Placeholder |
 
 ## Settings
 
@@ -51,13 +52,18 @@ All destinations navigate the `ContentFrame` to `ShellPage` with the destination
 - Clicking it opens a `ContentDialog` modal (`SettingsDialog`) with:
   - FFI/core version badge
   - Bind Mode combo (Local / Global / Custom)
-  - Port text box
-  - API Token (read-only)
+  - Port text box — pre-populated from `wdmm_openapi_port()` if the server is already running
+  - API Token (read-only) — pre-populated from `wdmm_token_get()`
 - The dialog content panel is backed by an `AcrylicBrush` (tinted, `TintOpacity 0.65`).
+- **Save** calls `wdmm_openapi_start(port)`; on success the token and bound port fields
+  refresh from live FFI. Errors are shown inline without closing the dialog.
+- All FFI calls are wrapped in try/catch — `wdmm_ffi.dll` absent on Linux is a no-op.
 
 ## FFI Smoke
 
-`wdmm_version()` is called in the `MainWindow` constructor. The result (or error message) appears in the sidebar status strip and is passed to the Settings dialog. The `CopyRustDll` MSBuild target is unchanged.
+`wdmm_version()` is called in the `MainWindow` constructor. The result (or error message)
+appears in the sidebar status strip and is passed to the Settings dialog.
+The `CopyRustDll` MSBuild target is unchanged.
 
 ## How to Run
 
@@ -83,25 +89,27 @@ dotnet build -c Debug
 dotnet run --project WdmmDesktop.csproj
 ```
 
-`wdmm_ffi.dll` must be copied to the output directory for the FFI smoke test to pass. Without it the app still launches; the status strip shows the load error.
+`wdmm_ffi.dll` must be copied to the output directory for the FFI smoke test to pass.
+Without it the app still launches; the status strip shows the load error, and Settings Save
+is a silent no-op.
 
 ## Files Changed / Added
 
 | Path | Change |
 |------|--------|
 | `WdmmDesktop/App.xaml` | Added `NavItemStyle` (RadioButton as nav pill) |
-| `WdmmDesktop/MainWindow.xaml` | Full rewrite — Mica, immersive title bar, sidebar, content frame |
-| `WdmmDesktop/MainWindow.xaml.cs` | Full rewrite — title bar setup, FFI smoke, sidebar toggle, navigation |
-| `WdmmDesktop/Pages/ShellPage.xaml` | New — placeholder page (icon + title, no background) |
-| `WdmmDesktop/Pages/ShellPage.xaml.cs` | New |
-| `WdmmDesktop/Dialogs/SettingsDialog.xaml` | New — ContentDialog with AcrylicBrush |
-| `WdmmDesktop/Dialogs/SettingsDialog.xaml.cs` | New |
-| `docs/DESKTOP-SHELL-DEMO.md` | New — this document |
+| `WdmmDesktop/MainWindow.xaml` | Mica, immersive title bar, sidebar, content frame; labels Music/Network (was Music Library/Network Library) |
+| `WdmmDesktop/MainWindow.xaml.cs` | Title bar setup, FFI smoke, sidebar toggle, navigation; updated label refs |
+| `WdmmDesktop/Pages/ShellPage.xaml` | Placeholder page (icon + title, no background) |
+| `WdmmDesktop/Pages/ShellPage.xaml.cs` | Per-destination icon glyph in `OnNavigatedTo` |
+| `WdmmDesktop/Dialogs/SettingsDialog.xaml` | ContentDialog with AcrylicBrush; SaveStatusText strip; token starts empty |
+| `WdmmDesktop/Dialogs/SettingsDialog.xaml.cs` | `LoadFfiState()` pre-populates port+token; `PrimaryButtonClick` wired to `wdmm_openapi_start` |
+| `docs/DESKTOP-SHELL-DEMO.md` | Updated destinations table, Settings section, files table |
 
 ## TODOs
 
-- Wire Bind Mode / Port / Token Save button to actual `wdmm_openapi_*` FFI calls.
-- Add `CopyRustDll` MSBuild target to auto-deploy `wdmm_ffi.dll` to output on Windows.
 - Replace placeholder pages with real UI (file browser, track list, playlist editor, etc.).
 - Animate sidebar expand/collapse with a `DoubleAnimation` on `SidebarColumn.Width`.
 - Persist sidebar state (expanded/collapsed) and last selected destination across launches.
+- Support Bind Mode (Custom host) once `wdmm_openapi_start` accepts a bind address.
+- Add a Rotate Token button to the Settings dialog (`wdmm_token_rotate`).

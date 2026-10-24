@@ -16,6 +16,17 @@ namespace WdmmDesktop.Pages
             if (e.Parameter is string title && !string.IsNullOrEmpty(title))
             {
                 PageTitle.Text = title;
+                PageIcon.Glyph = title switch
+                {
+                    "Folders"   => "",
+                    "Music"     => "",
+                    "Playlists" => "",
+                    "Manga"     => "",
+                    "Network"   => "",
+                    "Tasks"     => "",
+                    "About"     => "",
+                    _           => "",
+                };
             }
         }
     }

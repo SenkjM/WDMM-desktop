@@ -63,8 +63,8 @@ namespace WdmmDesktop
         {
             _navLabels = new List<TextBlock>
             {
-                LblFolders, LblMusicLibrary, LblPlaylists,
-                LblManga, LblNetworkLibrary, LblTasks, LblAbout,
+                LblFolders, LblMusic, LblPlaylists,
+                LblManga, LblNetwork, LblTasks, LblAbout,
                 LblSettings
             };
         }
