@@ -265,6 +265,28 @@ namespace WdmmDesktop.Generated
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
         public static extern FfiString wdmm_proxy_unregister(IntPtr token);
 
+        // ── HLS / Range proxy (feat/proxy-hls-ffmpeg) ─────────────────────────
+        // TODO: these are the expected signatures for the HLS transcode + Range
+        // request path that feat/proxy-hls-ffmpeg will export. They are NOT yet
+        // present in the submodule at the current SHA — CastPage enforces a guard
+        // so the HLS toggle refuses to cast (no silent fallback) until the
+        // submodule is bumped to the merged feat/proxy-hls-ffmpeg SHA.
+        //
+        // When the branch lands, uncomment and wire into CastPage.PerformProxyCast
+        // for the ForceDirect=false path.
+        //
+        // /// <summary>
+        // /// Start an HLS transcode of <paramref name="filePath"/> via ffmpeg and
+        // /// register it with the proxy. Returns JSON {"token":"…","path_template":"/hls/…","port":N}
+        // /// or "error:…". Range requests are honoured on the resulting URL.
+        // /// </summary>
+        // [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        // public static extern FfiString wdmm_proxy_start_hls(IntPtr filePath, IntPtr name);
+        //
+        // /// <summary>Stop an in-progress HLS transcode by token. Returns "ok".</summary>
+        // [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        // public static extern FfiString wdmm_proxy_stop_hls(IntPtr token);
+
         // ── Helper extensions ─────────────────────────────────────────────────
 
         /// <summary>

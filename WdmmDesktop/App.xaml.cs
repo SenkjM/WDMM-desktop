@@ -1,11 +1,14 @@
 using Microsoft.UI.Xaml;
-using System;
 
 namespace WdmmDesktop
 {
     public partial class App : Application
     {
-        private Window? m_window;
+        /// <summary>
+        /// The single application window. Exposed so pages can reach the main
+        /// window to request sidebar selection changes (e.g. MusicPage → CastPage).
+        /// </summary>
+        public static MainWindow? MainWindow { get; private set; }
 
         public App()
         {
@@ -14,8 +17,8 @@ namespace WdmmDesktop
 
         protected override void OnLaunched(LaunchActivatedEventArgs args)
         {
-            m_window = new MainWindow();
-            m_window.Activate();
+            MainWindow = new MainWindow();
+            MainWindow.Activate();
         }
     }
 }

@@ -57,7 +57,7 @@
                          MaxLength="5" />
             </StackPanel>
 
-            <!-- Token (read-only) -->
+            <!-- Token (read-only) + rotate -->
             <StackPanel Spacing="6">
                 <TextBlock Text="API Token" FontWeight="SemiBold" FontSize="13" />
                 <TextBox x:Name="TokenBox"
@@ -65,6 +65,11 @@
                          IsReadOnly="True"
                          FontFamily="Cascadia Mono,Consolas,monospace"
                          FontSize="12" />
+                <Button x:Name="RotateTokenBtn"
+                        Content="Rotate Token"
+                        Click="RotateTokenBtn_Click"
+                        HorizontalAlignment="Left"
+                        Padding="12,6" />
                 <TextBlock Text="Native FFI clients on the same machine skip this token. External HTTP clients must include it in the Authorization header."
                            FontSize="11"
                            Opacity="0.6"
@@ -74,7 +79,6 @@
             <!-- Save status / error feedback -->
             <TextBlock x:Name="SaveStatusText"
                        FontSize="12"
-                       Foreground="{ThemeResource SystemFillColorCriticalBrush}"
                        TextWrapping="Wrap"
                        Visibility="Collapsed" />
 

@@ -84,7 +84,7 @@
                         </Button>
                     </Grid>
 
-                    <!-- NAV DESTINATIONS -->
+                    <!-- NAV DESTINATIONS (mirrors Android HomeShell order) -->
                     <StackPanel Grid.Row="1"
                                 x:Name="NavItemsPanel"
                                 Spacing="2"
@@ -154,6 +154,17 @@
                             <StackPanel Orientation="Horizontal" Spacing="12">
                                 <FontIcon Glyph="&#xE896;" FontSize="16" />
                                 <TextBlock x:Name="LblTasks" Text="Tasks" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </RadioButton>
+
+                        <RadioButton x:Name="NavCast"
+                                     GroupName="ShellNav"
+                                     Tag="Cast"
+                                     Checked="NavItem_Checked"
+                                     Style="{StaticResource NavItemStyle}">
+                            <StackPanel Orientation="Horizontal" Spacing="12">
+                                <FontIcon Glyph="&#xE93E;" FontSize="16" />
+                                <TextBlock x:Name="LblCast" Text="Cast" VerticalAlignment="Center" />
                             </StackPanel>
                         </RadioButton>
 

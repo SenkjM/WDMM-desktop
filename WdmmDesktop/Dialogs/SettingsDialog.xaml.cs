@@ -45,8 +45,7 @@ namespace WdmmDesktop.Dialogs
             {
                 if (!ushort.TryParse(PortBox.Text.Trim(), out var port) || port < 1024)
                 {
-                    SaveStatusText.Text = "Port must be 1024–65535.";
-                    SaveStatusText.Visibility = Visibility.Visible;
+                    ShowStatus("Port must be 1024–65535.", isError: true);
                     args.Cancel = true;
                     return;
                 }
@@ -56,13 +55,12 @@ namespace WdmmDesktop.Dialogs
                     var result = NativeMethods.StartOpenApi(port);
                     if (result.StartsWith("error:"))
                     {
-                        SaveStatusText.Text = result;
-                        SaveStatusText.Visibility = Visibility.Visible;
+                        ShowStatus(result, isError: true);
                         args.Cancel = true;
                         return;
                     }
 
-                    SaveStatusText.Visibility = Visibility.Collapsed;
+                    ShowStatus("", isError: false);
 
                     // result is the bearer token on success; re-read to confirm.
                     var token = NativeMethods.TokenGet();
@@ -75,13 +73,48 @@ namespace WdmmDesktop.Dialogs
                 catch
                 {
                     // FFI not loaded (Linux dev) — treat Save as a no-op and close.
-                    // Keep Mica/immersive title bar untouched.
                 }
             }
             finally
             {
                 deferral.Complete();
             }
+        }
+
+        // Rotate the bearer token and refresh the display.
+        private void RotateTokenBtn_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                var newToken = NativeMethods.TokenRotate();
+                if (newToken.StartsWith("error:"))
+                {
+                    ShowStatus(newToken, isError: true);
+                }
+                else
+                {
+                    TokenBox.Text = newToken;
+                    ShowStatus("Token rotated.", isError: false);
+                }
+            }
+            catch
+            {
+                ShowStatus("FFI not loaded — rotate unavailable.", isError: true);
+            }
+        }
+
+        private void ShowStatus(string message, bool isError)
+        {
+            if (string.IsNullOrEmpty(message))
+            {
+                SaveStatusText.Visibility = Visibility.Collapsed;
+                return;
+            }
+            SaveStatusText.Text = message;
+            SaveStatusText.Foreground = isError
+                ? (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["SystemFillColorCriticalBrush"]
+                : (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["TextFillColorPrimaryBrush"];
+            SaveStatusText.Visibility = Visibility.Visible;
         }
     }
 }
