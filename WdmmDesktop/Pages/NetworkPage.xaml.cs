@@ -7,6 +7,7 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Navigation;
 using WdmmDesktop.Generated;
 using WdmmDesktop.Models;
+using WdmmDesktop;
 
 namespace WdmmDesktop.Pages
 {

@@ -8,6 +8,7 @@ using Microsoft.UI.Xaml.Navigation;
 using WdmmDesktop.Dialogs;
 using WdmmDesktop.Generated;
 using WdmmDesktop.Models;
+using WdmmDesktop;
 
 namespace WdmmDesktop.Pages
 {
