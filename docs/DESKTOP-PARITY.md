@@ -43,27 +43,32 @@ Chrome rules are unchanged from the shell demo:
 | **Manga** | stub | BLOCKED — `wdmm_manga_list` / chapter APIs not in FFI or OpenAPI @ d8b2217 (storage tables `manga_series`/`manga_chapters` exist; no CRUD yet). Rich library-shaped page with always-open InfoBar naming missing APIs. |
 | **Network** | partial | WebDAV account form; account list persisted locally (`%LOCALAPPDATA%\Wdmm\accounts.json`). Sync Now wired to `wdmm_sync_trigger`. TODO: `wdmm_account_list` / `wdmm_account_save` FFI not yet exported. |
 | **Tasks** | **real** | Queue list from `wdmm_queue_status_json()`. Pending count badge. Per-task cancel via `wdmm_queue_cancel`. |
-| **Cast / DLNA** | **real** | DMR discovery via `wdmm_dlna_discover_json(2000 ms)`. USN-keyed compat prefs persisted to `%LOCALAPPDATA%\Wdmm\dmr_prefs.json`. Proxy-only cast enforced. Single-file mutex. HLS: **DEFERRED pending Core R12 / proxy-hls** — no submodule bump this slice, no Cast HLS unlock (see HLS section below). |
+| **Cast / DLNA** | **real** | DMR discovery via `wdmm_dlna_discover_json(2000 ms)`. USN-keyed compat prefs persisted to `%LOCALAPPDATA%\Wdmm\dmr_prefs.json`. Proxy-only cast enforced. Single-file mutex (HLS tokens via `ProxyUnregisterHls`, file tokens via `ProxyUnregister`). HLS: **unlocked** — `ProxyRegisterHls(device_id: Usn, filePath)` (wdmm-core e236ece). LocalFile→register_file or register_hls. LocalStream hook prepared — refuses until cloud/crypt drivers exist. NetworkDirect refuses (cache first). No silent HLS↔direct fallback. `ContentDeliveryKind` model wired. |
 | **Settings** | **real** | `wdmm_openapi_start`, `wdmm_token_get`, `wdmm_token_rotate`. Bind Mode + Port + Token display. |
 | **About** | **real** | `wdmm_version()`, OpenAPI running status + port, parity matrix summary. |
 
 ---
 
-## HLS — Deferred pending Core R12 / proxy-hls
+## HLS — Unlocked (wdmm-core e236ece, P0.5)
 
-> **HLS cast is deferred in this slice.** Submodule remains at `d8b2217`.
-> No submodule bump. No `wdmm_proxy_register_hls` wiring. No Cast HLS unlock.
->
-> Unblocked by: `wdmm-core feat/proxy-hls-ffmpeg` merging into main (Core R12).
-> When it lands: bump submodule, uncomment `wdmm_proxy_start_hls` / `wdmm_proxy_stop_hls`
-> P/Invoke in `Generated/NativeMethods.g.cs`, and remove the HLS guard in `CastPage.CastBtn_Click`.
+HLS cast is now fully wired. Submodule bumped to `e236ece` (feat/proxy-hls-ffmpeg merged).
+
+**LocalFile cast path:**
+- `ForceDirect = true`  → `ProxyRegisterFile` — direct-stream proxy, no transcode.
+- `ForceDirect = false` → `ProxyRegisterHls(device_id: Usn, filePath, modeJson: null)` — HLS transcode via ffmpeg. `device_id` is the renderer's Usn (stable, per locked rule 4). Returns `{"token","playlist_template","port"}`.
+
+**LocalStream hook (prepared, not yet active):**
+`CastPage.PerformProxyCast` has an explicit hook that returns a clear `NotSupported` error until a real `WdmmProxyRangeCallback` source exists. Do NOT invent a Dart bridge.
+
+**NetworkDirect refuse:**
+A bare http(s) URL has no local file to proxy. CastPage refuses with an explicit error (locked rule 1). Future path: materialize → LocalFile, or register_stream with a fetch callback.
 
 Cast / DLNA locked rules (unchanged — mirrors Android):
-1. **DLNA → proxy only.** The proxy URL (`http://127.0.0.1:{port}/s/…`) is sent to the renderer; a raw `file://` or direct path is never passed.
-2. **Single-file mutex.** Before registering a new proxy token, the previous one is unregistered.
+1. **DLNA → proxy only.** The proxy URL is sent to the renderer; raw `file://` or direct path never passed.
+2. **Single-file mutex.** Previous token unregistered before a new one is registered. HLS tokens use `ProxyUnregisterHls`; file tokens use `ProxyUnregister`.
 3. **No auto HLS ↔ direct fallback.** The user's per-DMR `ForceDirect` choice is honoured verbatim.
 4. **USN-keyed DMR preferences** — persisted to `%LOCALAPPDATA%\Wdmm\dmr_prefs.json`.
-5. **HLS mode is blocked** until Core R12 / proxy-hls lands. The toggle is present but the cast aborts with an explicit message if `ForceDirect = false` is chosen.
+5. **HLS mode is live.** `wdmm_proxy_register_hls` / `_unregister_hls` / `_hls_seek` wired and exposed via safe C# wrappers.
 
 ---
 
@@ -85,10 +90,15 @@ Cast / DLNA locked rules (unchanged — mirrors Android):
 | `wdmm_dlna_discover_json` | ✓ | CastPage |
 | `wdmm_dlna_cast` | ✓ | CastPage |
 | `wdmm_proxy_start` / `_stop` / `_port` | ✓ | CastPage |
-| `wdmm_proxy_register_file` | ✓ | CastPage |
-| `wdmm_proxy_unregister` | ✓ | CastPage (single-file mutex) |
+| `wdmm_proxy_register_file` | ✓ | CastPage (ForceDirect=true) |
+| `wdmm_proxy_unregister` | ✓ | CastPage (single-file mutex, file tokens) |
 | `wdmm_sync_trigger` | ✓ | NetworkPage |
-| `wdmm_proxy_start_hls` | **DEFERRED** | CastPage HLS path — blocked pending Core R12 / proxy-hls |
+| `wdmm_proxy_register_hls` | ✓ | CastPage (ForceDirect=false, HLS transcode) |
+| `wdmm_proxy_unregister_hls` | ✓ | CastPage (single-file mutex, HLS tokens) |
+| `wdmm_proxy_hls_seek` | ✓ | NativeMethods (wrapper present; cast UI may not call yet) |
+| `wdmm_proxy_stream_alloc_buf` / `_free_buf` | ✓ | NativeMethods (bindings present) |
+| `wdmm_proxy_register_stream` | ✓ | NativeMethods (binding + wrapper present; CastPage hook prepared — no stream source yet) |
+| `wdmm_proxy_renew_stream_callback` | ✓ | NativeMethods (binding + wrapper present) |
 | `wdmm_webdav_list` | **TODO** | FoldersPage remote browse |
 | `wdmm_playlist_list` / `_save` | **TODO** | PlaylistsPage (currently: OpenAPI bridge) |
 | `wdmm_manga_list` / `_chapters` | **TODO** | MangaPage |
@@ -114,19 +124,9 @@ All requests carry `Authorization: Bearer {TokenGet()}`.
 
 ## Submodule
 
-Current SHA pinned in worktree: **d8b22178049d800ecfa4f4ad0879e0372ac33f71**
+Current SHA pinned in worktree: **e236ece28c0bb5b9a080ea9e53936ef6e5d0d961** (P0.5 — proxy delivery + HLS FFI)
 
-**Do not bump** this slice. HLS deferred — see section above.
-
-To unlock HLS cast (after Core R12 lands):
-```
-cd rust/wdmm-core
-git fetch origin feat/proxy-hls-ffmpeg
-git checkout <merged-SHA>
-cd ../..
-git add rust/wdmm-core
-git commit -m "chore(submodule): bump wdmm-core to feat/proxy-hls-ffmpeg SHA"
-```
+Previous SHA: `d8b22178049d800ecfa4f4ad0879e0372ac33f71` (Round 10)
 Then uncomment the `wdmm_proxy_start_hls` / `wdmm_proxy_stop_hls` P/Invoke declarations in
 `WdmmDesktop/Generated/NativeMethods.g.cs` and remove the HLS guard in `CastPage.CastBtn_Click`.
 
@@ -204,8 +204,12 @@ dotnet build -c Debug
 | `WdmmDesktop/MainWindow.xaml` | Cast nav item (E93E glyph) |
 | `WdmmDesktop/MainWindow.xaml.cs` | Real page routing; library_init on startup; SelectNavItem() |
 | `WdmmDesktop/App.xaml.cs` | Exposed static MainWindow ref for cross-page nav |
-| `WdmmDesktop/Generated/NativeMethods.g.cs` | HLS/Range stub comments for feat/proxy-hls-ffmpeg |
-| `docs/DESKTOP-PARITY.md` | **UPDATED** — this file; Folders/Playlists/Manga matrix + HLS deferred note |
+| `WdmmDesktop/Models/ContentDeliveryKind.cs` | **NEW** — `ContentDeliveryKind` enum + `ContentDeliveryKindHelper.Infer` (mirrors Core @ e236ece) |
+| `WdmmDesktop/Generated/NativeMethods.g.cs` | **UPDATED** — HLS/stream P/Invoke + safe wrappers (replaces deferred stubs) |
+| `WdmmDesktop/Pages/CastPage.xaml/.cs` | **UPDATED** — HLS unlocked; ContentDeliveryKind cast path; LocalStream hook; NetworkDirect refuse |
+| `WdmmDesktop/Models/DmrDevice.cs` | **UPDATED** — comments reflect HLS live; `_activeTokenIsHls` mutex docs |
+| `WdmmDesktop/Pages/AboutPage.xaml/.cs` | **UPDATED** — parity matrix reflects HLS live; LocalStream/NetworkDirect status |
+| `docs/DESKTOP-PARITY.md` | **UPDATED** — this file; HLS section + FFI matrix + submodule SHA |
 
 ---
 
@@ -217,6 +221,7 @@ dotnet build -c Debug
 | Folders remote WebDAV (`wdmm_webdav_list`) | wdmm-core exports FFI |
 | Manga library (`wdmm_manga_list` / `_chapters`) | wdmm-core adds CRUD + FFI export |
 | Network account CRUD (`wdmm_account_*`) | wdmm-core exports FFI; replace local JSON |
-| Cast HLS mode (`wdmm_proxy_start_hls`) | **Core R12 / proxy-hls** — bump submodule; see HLS section |
+| Cast HLS mode (`wdmm_proxy_register_hls`) | **DONE** — wired in P0.5 (wdmm-core e236ece) |
+| LocalStream cast (`wdmm_proxy_register_stream`) | Bindings + hook present; needs desktop cloud/crypt driver |
 | Sidebar animation | Polish (DoubleAnimation on SidebarColumn.Width) — not parity-blocking |
 | Sidebar state persistence | Persist last destination + expand/collapse across launches |

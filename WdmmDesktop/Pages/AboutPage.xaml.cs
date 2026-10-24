@@ -47,7 +47,9 @@ namespace WdmmDesktop.Pages
                 "Network    part  — wdmm_sync_trigger; account CRUD local JSON\n"      +
                 "Tasks      real  — wdmm_queue_status_json / cancel\n"                  +
                 "Cast/DLNA  real  — wdmm_dlna_discover_json / wdmm_dlna_cast\n"        +
-                "              HLS DEFERRED — pending Core R12 / proxy-hls\n"          +
+                "              HLS: ProxyRegisterHls (wdmm-core e236ece)\n"            +
+                "              LocalStream hook prepared (no desktop drivers yet)\n"   +
+                "              NetworkDirect refuses (cache file first)\n"             +
                 "Settings   real  — wdmm_openapi_start / token_get / token_rotate\n"   +
                 "About      real  — wdmm_version";
         }
