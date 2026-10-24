@@ -265,27 +265,86 @@ namespace WdmmDesktop.Generated
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
         public static extern FfiString wdmm_proxy_unregister(IntPtr token);
 
-        // ── HLS / Range proxy (feat/proxy-hls-ffmpeg) ─────────────────────────
-        // TODO: these are the expected signatures for the HLS transcode + Range
-        // request path that feat/proxy-hls-ffmpeg will export. They are NOT yet
-        // present in the submodule at the current SHA — CastPage enforces a guard
-        // so the HLS toggle refuses to cast (no silent fallback) until the
-        // submodule is bumped to the merged feat/proxy-hls-ffmpeg SHA.
-        //
-        // When the branch lands, uncomment and wire into CastPage.PerformProxyCast
-        // for the ForceDirect=false path.
-        //
-        // /// <summary>
-        // /// Start an HLS transcode of <paramref name="filePath"/> via ffmpeg and
-        // /// register it with the proxy. Returns JSON {"token":"…","path_template":"/hls/…","port":N}
-        // /// or "error:…". Range requests are honoured on the resulting URL.
-        // /// </summary>
-        // [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
-        // public static extern FfiString wdmm_proxy_start_hls(IntPtr filePath, IntPtr name);
-        //
-        // /// <summary>Stop an in-progress HLS transcode by token. Returns "ok".</summary>
-        // [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
-        // public static extern FfiString wdmm_proxy_stop_hls(IntPtr token);
+        // ── Proxy HLS (wdmm-core e236ece — P0.5 proxy delivery + HLS FFI) ──────
+        // Process-global HLS session management. Requires wdmm_proxy_start first.
+        // The proxy supplies only the token path; callers compose the full URL.
+
+        /// <summary>
+        /// Register an HLS session for <paramref name="deviceId"/> +
+        /// <paramref name="filePath"/>. <paramref name="modeJson"/> may be
+        /// <see cref="IntPtr.Zero"/> (→ {"mode":"direct_copy"}). Returns JSON
+        /// {"token":"…","playlist_template":"/h/…/index.m3u8","port":N} or
+        /// "error:…". Build URL as http://127.0.0.1:{port}{playlist_template}.
+        /// Caller must free.
+        /// </summary>
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern FfiString wdmm_proxy_register_hls(
+            IntPtr deviceId,
+            IntPtr filePath,
+            IntPtr modeJson);
+
+        /// <summary>
+        /// Revoke an HLS session. Kills the transcode job and cleans the segment
+        /// directory. Returns "ok".
+        /// </summary>
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern FfiString wdmm_proxy_unregister_hls(IntPtr token);
+
+        /// <summary>
+        /// Seek an active HLS session to <paramref name="offsetSecs"/>. Kills the
+        /// current transcode job and restarts from the new offset.
+        /// Returns "ok" or "error:…". Caller must free.
+        /// </summary>
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern FfiString wdmm_proxy_hls_seek(IntPtr token, double offsetSecs);
+
+        // ── Proxy stream (LocalStream / MustProxy — wdmm-core e236ece) ──────────
+        // Used for ContentDeliveryKind.LocalStream (crypt, streaming-only drivers).
+        // Desktop has no cloud/crypt drivers today; CastPage has an explicit hook
+        // that returns NotSupported until a real stream source exists.
+        // Do NOT invent a Dart bridge.
+
+        /// <summary>
+        /// Range callback: supplies bytes [start, end] on demand from a Tokio worker
+        /// thread. Must be thread-safe for the lifetime of the registration.
+        /// Allocate *outBuf via <see cref="wdmm_proxy_stream_alloc_buf"/>; Rust
+        /// reclaims it after consuming. Return 0 on success, negative on error.
+        /// </summary>
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate int WdmmProxyRangeCallback(
+            IntPtr userData, long start, long end,
+            out IntPtr outBuf, out nuint outLen);
+
+        /// <summary>
+        /// Allocate <paramref name="len"/> bytes on Rust's heap for a callback
+        /// output buffer. Returns <see cref="IntPtr.Zero"/> if len == 0.
+        /// </summary>
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern IntPtr wdmm_proxy_stream_alloc_buf(nuint len);
+
+        /// <summary>Free a buffer from wdmm_proxy_stream_alloc_buf. No-op if null/zero.</summary>
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern void wdmm_proxy_stream_free_buf(IntPtr buf, nuint len);
+
+        /// <summary>
+        /// Register an in-process Range/byte stream with the proxy.
+        /// <paramref name="size"/> — total bytes (0 = unknown / stream until EOF).
+        /// <paramref name="name"/> — nullable; used only for Content-Type guessing.
+        /// Returns JSON {"token":"…","path_template":"/s/…","port":N} or "error:…".
+        /// Caller must free.
+        /// </summary>
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern FfiString wdmm_proxy_register_stream(
+            ulong size, IntPtr name, WdmmProxyRangeCallback cb, IntPtr userData);
+
+        /// <summary>
+        /// Replace the Range callback for an existing stream registration.
+        /// No-op if <paramref name="token"/> refers to a file (not stream) registration.
+        /// Returns "ok".
+        /// </summary>
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern FfiString wdmm_proxy_renew_stream_callback(
+            IntPtr token, WdmmProxyRangeCallback cb, IntPtr userData);
 
         // ── Helper extensions ─────────────────────────────────────────────────
 
@@ -441,5 +500,78 @@ namespace WdmmDesktop.Generated
         /// </summary>
         public static string LibraryImportFromSqflite(string oldDbPath)
             => WithNativeString(oldDbPath, wdmm_library_import_from_sqflite);
+
+        // ── Proxy HLS wrappers ────────────────────────────────────────────────
+
+        /// <summary>
+        /// Register an HLS session. <paramref name="modeJson"/> null →
+        /// {"mode":"direct_copy"}. Returns JSON
+        /// {"token","playlist_template","port"} or "error:…".
+        /// </summary>
+        public static string ProxyRegisterHls(string deviceId, string filePath, string? modeJson = null)
+        {
+            byte[]? modeBytes = modeJson is null
+                ? null
+                : System.Text.Encoding.UTF8.GetBytes(modeJson + '\0');
+            IntPtr modePtr = modeBytes is null ? IntPtr.Zero : Marshal.AllocHGlobal(modeBytes.Length);
+            try
+            {
+                if (modeBytes is not null) Marshal.Copy(modeBytes, 0, modePtr, modeBytes.Length);
+                var devBytes = System.Text.Encoding.UTF8.GetBytes(deviceId + '\0');
+                var devPtr   = Marshal.AllocHGlobal(devBytes.Length);
+                try
+                {
+                    Marshal.Copy(devBytes, 0, devPtr, devBytes.Length);
+                    return WithNativeString(filePath, fp => wdmm_proxy_register_hls(devPtr, fp, modePtr));
+                }
+                finally { Marshal.FreeHGlobal(devPtr); }
+            }
+            finally { if (modePtr != IntPtr.Zero) Marshal.FreeHGlobal(modePtr); }
+        }
+
+        /// <summary>Revoke an HLS session token. Returns "ok".</summary>
+        public static string ProxyUnregisterHls(string token)
+            => WithNativeString(token, wdmm_proxy_unregister_hls);
+
+        /// <summary>Seek an active HLS session to offsetSecs. Returns "ok" or "error:…".</summary>
+        public static string ProxyHlsSeek(string token, double offsetSecs)
+        {
+            var bytes = System.Text.Encoding.UTF8.GetBytes(token + '\0');
+            var ptr   = Marshal.AllocHGlobal(bytes.Length);
+            try   { Marshal.Copy(bytes, 0, ptr, bytes.Length); return wdmm_proxy_hls_seek(ptr, offsetSecs).ToStringAndFree(); }
+            finally { Marshal.FreeHGlobal(ptr); }
+        }
+
+        // ── Proxy stream wrappers (LocalStream / MustProxy hooks) ─────────────
+
+        /// <summary>
+        /// Register a byte-stream source. <paramref name="size"/> 0 = unknown.
+        /// <paramref name="name"/> nullable (Content-Type guessing).
+        /// Returns JSON {"token","path_template","port"} or "error:…".
+        /// </summary>
+        public static string ProxyRegisterStream(
+            ulong size, string? name, WdmmProxyRangeCallback cb, IntPtr userData)
+        {
+            byte[]? nameBytes = name is null
+                ? null
+                : System.Text.Encoding.UTF8.GetBytes(name + '\0');
+            IntPtr namePtr = nameBytes is null ? IntPtr.Zero : Marshal.AllocHGlobal(nameBytes.Length);
+            try
+            {
+                if (nameBytes is not null) Marshal.Copy(nameBytes, 0, namePtr, nameBytes.Length);
+                return wdmm_proxy_register_stream(size, namePtr, cb, userData).ToStringAndFree();
+            }
+            finally { if (namePtr != IntPtr.Zero) Marshal.FreeHGlobal(namePtr); }
+        }
+
+        /// <summary>Replace the Range callback for an existing stream token. Returns "ok".</summary>
+        public static string ProxyRenewStreamCallback(
+            string token, WdmmProxyRangeCallback cb, IntPtr userData)
+        {
+            var bytes = System.Text.Encoding.UTF8.GetBytes(token + '\0');
+            var ptr   = Marshal.AllocHGlobal(bytes.Length);
+            try   { Marshal.Copy(bytes, 0, ptr, bytes.Length); return wdmm_proxy_renew_stream_callback(ptr, cb, userData).ToStringAndFree(); }
+            finally { Marshal.FreeHGlobal(ptr); }
+        }
     }
 }
