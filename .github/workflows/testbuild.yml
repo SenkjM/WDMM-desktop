@@ -1,0 +1,241 @@
+name: Testbuild
+
+# Portable zip testbuild for WDMM Desktop (WinUI 3 / Windows App SDK, unpackaged).
+# No tags, no GitHub Release, no MSIX, no MSI — portable zip only.
+#
+# Artifact chain: dispatch SenkjM/WDMM-core → native-artifacts (feat/proxy-hls-ffmpeg)
+# FIRST to produce wdmm-ffi-windows-x64 for the Core SHA pinned as a submodule here.
+# Then dispatch this workflow; it downloads the matching DLL and publishes a
+# self-contained win-x64 portable folder → zip.
+#
+# Version: 0.0.0-testbuild.<run_number> (no semver tag required).
+# Zip name: WDMM-desktop-0.0.0-testbuild.<run>-<sha7>-win-x64.zip
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: write
+
+jobs:
+  windows:
+    name: Build portable win-x64 zip
+    runs-on: windows-latest
+    env:
+      # Cross-repo artifact download: WDMM_CORE_READ_TOKEN is a PAT with
+      # actions:read on SenkjM/WDMM-core. Falls back to GITHUB_TOKEN when
+      # both repos share visibility (same user/org).
+      GH_TOKEN: ${{ secrets.WDMM_CORE_READ_TOKEN || secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Read Core submodule SHA
+        shell: bash
+        run: |
+          CORE_SHA="$(git -C rust/wdmm-core rev-parse HEAD)"
+          echo "CORE_SHA=$CORE_SHA" >> "$GITHUB_ENV"
+          echo "Core submodule SHA: $CORE_SHA"
+
+      # Scans the last 20 successful runs of native-artifacts on
+      # feat/proxy-hls-ffmpeg in SenkjM/WDMM-core; downloads the first run
+      # whose COMMIT.txt matches the submodule SHA exactly.
+      # Fails clearly if none found — do NOT fall back silently.
+      - name: Download wdmm_ffi.dll from Core CI
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Scanning Core native-artifacts runs for SHA: $CORE_SHA"
+
+          DLL_STAGING="$RUNNER_TEMP/wdmm-ffi-win"
+          mkdir -p "$DLL_STAGING"
+
+          MATCHED_RUN=""
+          while IFS= read -r run_id; do
+            TMPDIR_ART="$(mktemp -d)"
+            if gh run download "$run_id" \
+                --repo SenkjM/WDMM-core \
+                -n wdmm-ffi-windows-x64 \
+                -D "$TMPDIR_ART" 2>/dev/null; then
+              COMMIT_FILE="$TMPDIR_ART/COMMIT.txt"
+              if [ -f "$COMMIT_FILE" ]; then
+                ART_SHA="$(tr -d '[:space:]' < "$COMMIT_FILE")"
+                if [ "$ART_SHA" = "$CORE_SHA" ]; then
+                  cp "$TMPDIR_ART/wdmm_ffi.dll" "$DLL_STAGING/wdmm_ffi.dll"
+                  MATCHED_RUN="$run_id"
+                  rm -rf "$TMPDIR_ART"
+                  break
+                fi
+              fi
+            fi
+            rm -rf "$TMPDIR_ART"
+          done < <(gh run list \
+            --repo SenkjM/WDMM-core \
+            --workflow native-artifacts.yml \
+            --branch feat/proxy-hls-ffmpeg \
+            --status success \
+            --limit 20 \
+            --json databaseId \
+            --jq '.[].databaseId')
+
+          if [ -z "$MATCHED_RUN" ]; then
+            echo "::error::No successful native-artifacts run found for Core SHA ${CORE_SHA}."
+            echo "::error::Dispatch SenkjM/WDMM-core → native-artifacts on feat/proxy-hls-ffmpeg at that commit first."
+            exit 1
+          fi
+          echo "DLL_STAGING=$DLL_STAGING" >> "$GITHUB_ENV"
+          echo "wdmm_ffi.dll ready (run $MATCHED_RUN, Core SHA $CORE_SHA)"
+
+      # Place DLL where the csproj CopyRustDll MSBuild target expects it
+      # ($(SolutionDir)rust\wdmm-core\target\release\wdmm_ffi.dll) so that
+      # an optional post-build copy into OutDir also works.
+      - name: Place DLL at expected Rust output path
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p rust/wdmm-core/target/release
+          cp "$DLL_STAGING/wdmm_ffi.dll" rust/wdmm-core/target/release/wdmm_ffi.dll
+          echo "DLL placed at rust/wdmm-core/target/release/wdmm_ffi.dll"
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.x"
+
+      - name: Restore NuGet packages
+        run: dotnet restore WdmmDesktop/WdmmDesktop.csproj -p:Platform=x64
+
+      # Publish unpackaged self-contained win-x64 (WindowsPackageType=None +
+      # WindowsAppSDKSelfContained=true are already set in the csproj).
+      - name: Publish self-contained win-x64
+        run: >
+          dotnet publish WdmmDesktop/WdmmDesktop.csproj
+          -c Release
+          -r win-x64
+          --self-contained true
+          -p:Platform=x64
+          -p:WindowsPackageType=None
+          -p:WindowsAppSDKSelfContained=true
+          -o publish/win-x64
+
+      # Copy DLL next to the exe regardless of whether the CopyRustDll
+      # MSBuild target ran (it's documented as optional in the csproj/README).
+      - name: Copy DLL into publish output
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp rust/wdmm-core/target/release/wdmm_ffi.dll publish/win-x64/wdmm_ffi.dll
+          echo "wdmm_ffi.dll copied to publish/win-x64/"
+
+      # Stage the portable layout:
+      #   WDMM.cmd            outer launcher (relative paths)
+      #   PORTABLE-README.txt layout + DLL placement docs
+      #   bin/                MSI-payload-shaped tree copied from publish/win-x64
+      #     WdmmDesktop.exe   entry point + all published DLLs/assets at root
+      #     lib/wdmm_ffi.dll   Rust FFI bridge (moved off the root)
+      #
+      # All .NET/WinAppSDK DLLs stay beside the exe (deps.json references them
+      # by path relative to bin/); only wdmm_ffi.dll moves to bin/lib/ because
+      # App.xaml.cs calls SetDllDirectoryW("lib") to resolve it via P/Invoke.
+      # A future MSI installs the same bin/ payload (no launcher needed there).
+      - name: Stage portable folder
+        shell: bash
+        run: |
+          set -euo pipefail
+          SHORT_SHA="$(git rev-parse --short=7 HEAD)"
+          RUN="${{ github.run_number }}"
+          FOLDER_NAME="WDMM-desktop-0.0.0-testbuild.${RUN}-${SHORT_SHA}-win-x64"
+          STAGE="staging/$FOLDER_NAME"
+
+          mkdir -p "$STAGE/bin/lib"
+
+          # Copy the full self-contained publish output into bin/
+          cp -r publish/win-x64/. "$STAGE/bin/"
+
+          # Move wdmm_ffi.dll from bin/ root into bin/lib/.
+          # App.xaml.cs calls SetDllDirectoryW("lib") so P/Invoke resolves here.
+          if [ -f "$STAGE/bin/wdmm_ffi.dll" ]; then
+            mv "$STAGE/bin/wdmm_ffi.dll" "$STAGE/bin/lib/wdmm_ffi.dll"
+            echo "wdmm_ffi.dll -> bin/lib/wdmm_ffi.dll"
+          else
+            echo "::warning::wdmm_ffi.dll not found in publish output; bin/lib/ will be empty"
+          fi
+
+          # Outer launcher (relative .cmd; no absolute paths survive in the zip).
+          # Future MSI installs the same bin/ payload and uses its own shortcut,
+          # so this launcher is portable-zip-only.
+          cat > "$STAGE/WDMM.cmd" << 'CMDEOF'
+@echo off
+rem WDMM Desktop portable launcher.
+rem Starts WdmmDesktop.exe from bin\ relative to this script.
+rem Do not move this file independently of the bin\ folder.
+start "" "%~dp0bin\WdmmDesktop.exe" %*
+CMDEOF
+          cat > "$STAGE/PORTABLE-README.txt" << 'READMEEOF'
+WDMM Desktop - Portable Testbuild
+==================================
+
+Layout
+------
+  WDMM.cmd                   Relative launcher (recommended entry point).
+                             Uses %~dp0 so the zip can be extracted anywhere.
+  PORTABLE-README.txt        This file.
+  bin\                       MSI-payload-shaped tree.
+    WdmmDesktop.exe          Application entry point.
+    lib\wdmm_ffi.dll         Rust FFI bridge DLL.
+                             Loaded via SetDllDirectoryW("lib") at startup;
+                             no PATH change required.
+    [all other *.dll]        See "DLLs at bin\ root" below.
+    Assets\                  App icon / image assets.
+
+DLLs at bin\ root (boot-critical -- must not be moved without deps.json update)
+--------------------------------------------------------------------------------
+All *.dll files other than wdmm_ffi.dll remain at bin\ root because the
+.NET 8 self-contained publish writes a deps.json that references every
+framework and WinAppSDK assembly by its path relative to bin\.  Moving
+them to lib\ would require patching deps.json and is deferred.
+
+The following are especially critical:
+  hostfxr.dll / hostpolicy.dll             .NET host resolver + policy
+  coreclr.dll / clrjit.dll / clretwrc.dll  CLR, JIT, and ETW resources
+  Microsoft.WindowsAppRuntime.Bootstrap*.dll  WinAppSDK bootstrap
+  WdmmDesktop.dll                          Managed entry assembly
+  WdmmDesktop.runtimeconfig.json / WdmmDesktop.deps.json  Host config
+
+Managed assembly probing
+------------------------
+bin\lib is listed as probing privatePath in WdmmDesktop.exe.config.
+This is a no-op for the current self-contained layout (all assemblies are
+deps.json-referenced at bin\ root) but enables future managed assemblies
+placed in bin\lib\ to be found without further code changes.
+
+Future MSI note
+---------------
+A future MSI/WiX installer will install the same bin\ directory tree as-is.
+The portable WDMM.cmd launcher is not needed in the installed layout;
+the MSI shortcut targets WdmmDesktop.exe directly.
+READMEEOF
+          echo "FOLDER_NAME=$FOLDER_NAME" >> "$GITHUB_ENV"
+          echo "Portable layout staged at: $STAGE"
+          echo "  WDMM.cmd            : $([ -f "$STAGE/WDMM.cmd"             ] && echo OK || echo MISSING)"
+          echo "  PORTABLE-README.txt : $([ -f "$STAGE/PORTABLE-README.txt"  ] && echo OK || echo MISSING)"
+          echo "  bin/WdmmDesktop.exe : $([ -f "$STAGE/bin/WdmmDesktop.exe"  ] && echo OK || echo MISSING)"
+          echo "  bin/lib/wdmm_ffi.dll: $([ -f "$STAGE/bin/lib/wdmm_ffi.dll" ] && echo OK || echo MISSING)"
+
+      - name: Zip portable folder
+        shell: pwsh
+        run: |
+          $name = $env:FOLDER_NAME
+          Compress-Archive -Path "staging/$name/*" `
+            -DestinationPath "staging/$name.zip" -Force
+          Write-Host "Created staging/$name.zip"
+
+      - name: Upload testbuild-win-x64
+        uses: actions/upload-artifact@v4
+        with:
+          name: testbuild-win-x64
+          path: staging/${{ env.FOLDER_NAME }}.zip
+          if-no-files-found: error

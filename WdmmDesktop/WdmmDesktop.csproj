@@ -36,6 +36,17 @@
     <ProjectCapability Include="Msix" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- App.config → WdmmDesktop.exe.config in the publish output.
+         Sets probing privatePath="lib" so the managed loader also searches
+         bin\lib\ for assemblies.  No-op for the current self-contained layout
+         (all framework/WinAppSDK assemblies are deps.json-referenced at bin\
+         root); included to support future managed assemblies staged to bin\lib\
+         without further code changes.  Native DLL loading (wdmm_ffi.dll) is
+         handled by SetDllDirectoryW in App.xaml.cs, not by assembly probing. -->
+    <None Include="App.config" />
+  </ItemGroup>
+
   <!--
     FFI: wdmm-ffi is built from the git submodule at rust/wdmm-core (repo-root-relative).
     DLL output: rust/wdmm-core/target/release/wdmm_ffi.dll
