@@ -484,7 +484,7 @@ namespace WdmmDesktop.Pages
         // ── Data models ───────────────────────────────────────────────────────
 
         // Raw FFI folder JSON shape
-        private sealed class FolderRow
+        public sealed class FolderRow
         {
             [JsonPropertyName("id")]         public string Id        { get; set; } = "";
             [JsonPropertyName("name")]       public string Name      { get; set; } = "";
@@ -493,7 +493,7 @@ namespace WdmmDesktop.Pages
         }
 
         // Raw FFI item JSON shape
-        private sealed class ItemRow
+        public sealed class ItemRow
         {
             [JsonPropertyName("folder_id")]  public string FolderId  { get; set; } = "";
             [JsonPropertyName("ref_kind")]   public string RefKind   { get; set; } = "";
