@@ -16,6 +16,7 @@
       <!-- Unpackaged WinUI: avoid REGDB_E_CLASSNOTREG on Application.Start -->
     <WindowsPackageType>None</WindowsPackageType>
     <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
+    <DefaultLanguage>en-US</DefaultLanguage>
   </PropertyGroup>
 
   <ItemGroup>
