@@ -502,14 +502,29 @@ namespace WdmmDesktop.Pages
                         break;
                     case "crypt":
                         a.Credentials["password"] = JsonDocument.Parse($"\"{cryptPassBox.Password ?? ""}\"").RootElement;
-                        // TODO: resolve source account by name and build nested source object
+                        // Resolve source account by name and build nested source object with real credentials
                         var sourceName = sourceAccountBox.Text ?? "";
                         if (!string.IsNullOrEmpty(sourceName))
                         {
                             var sourceAcct = AccountStore.List().FirstOrDefault(x => x.DisplayNameField == sourceName);
                             if (sourceAcct != null)
                             {
-                                var sourceJson = $"{{\"provider_type\":\"{sourceAcct.ProviderType}\",\"config\":{{}}}}";
+                                // Build config object from source account credentials
+                                using var stream = new System.IO.MemoryStream();
+                                using var writer = new System.Text.Json.Utf8JsonWriter(stream);
+                                writer.WriteStartObject();
+                                writer.WriteString("provider_type", sourceAcct.ProviderType);
+                                writer.WritePropertyName("config");
+                                writer.WriteStartObject();
+                                foreach (var (key, value) in sourceAcct.Credentials)
+                                {
+                                    writer.WritePropertyName(key);
+                                    value.WriteTo(writer);
+                                }
+                                writer.WriteEndObject();
+                                writer.WriteEndObject();
+                                writer.Flush();
+                                var sourceJson = System.Text.Encoding.UTF8.GetString(stream.ToArray());
                                 a.Credentials["source"] = JsonDocument.Parse(sourceJson).RootElement;
                             }
                         }
