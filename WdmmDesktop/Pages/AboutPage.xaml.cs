@@ -48,7 +48,7 @@ namespace WdmmDesktop.Pages
                 "Settings   done   — 7 sections; all KV-backed controls live Wave C\n"    +
                 "              Queue concurrency slider live Wave D (Core fdb05df)\n"     +
                 "Tasks      done   — wdmm_queue_status_json / cancel (FFI)\n"             +
-                "File source done — dir browse via wdmm_webdav_*; sources via wdmm_account_*\n"     +
+                "File source done — multi-provider via CloudFfi.AccountListDir (Core account FFI)\n" +
                 "Settings   done   — TabView; Sync KV + sync_trigger + backup FFI\n" +
                 "Cast prefs done   — wdmm_dmr_prefs_* (Core dmr_prefs.db)\n" +
                 "Manga      done   — list/get/pages + upsert/set_progress/delete (FFI)\n" +

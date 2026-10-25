@@ -13,8 +13,8 @@ using WdmmDesktop.Services;
 namespace WdmmDesktop.Pages
 {
     /// <summary>
-    /// 文件源 directory browser — list/enter/up via <c>wdmm_webdav_*</c> FFI.
-    /// Sources from <c>wdmm_account_*</c> (AccountStore). No stub / 待 FFI UI.
+    /// 文件源 directory browser — multi-provider via <c>CloudFfi.Account*</c> (Core account FFI).
+    /// Sources from <c>wdmm_account_*</c> (AccountStore). Legacy webdav_* only if account has no Id.
     /// </summary>
     public sealed partial class NetworkPage : Page
     {
