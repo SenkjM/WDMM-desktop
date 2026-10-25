@@ -826,6 +826,85 @@ namespace WdmmDesktop.Generated
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
         public static extern FfiString wdmm_cue_remaining_slices(IntPtr sourceName, IntPtr cueRemotePath);
 
+        // ── Deleted tracks (v6 tombstones) ────────────────────────────────────
+        // Requires wdmm_library_init first.
+
+        /// <summary>
+        /// Upsert a deleted track tombstone from JSON.
+        /// Expected fields: {source_name, remote_path, rev, deleted_at, pushed}.
+        /// Returns "ok" or "error:…".
+        /// </summary>
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern FfiString wdmm_deleted_track_upsert(IntPtr json);
+
+        /// <summary>
+        /// Clear a deleted track tombstone by source and path.
+        /// Returns "ok" or "error:…".
+        /// </summary>
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern FfiString wdmm_deleted_track_clear(IntPtr sourceName, IntPtr remotePath);
+
+        /// <summary>
+        /// List all deleted tracks.
+        /// Returns JSON array or "error:…".
+        /// </summary>
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern FfiString wdmm_deleted_tracks_list();
+
+        /// <summary>
+        /// List unpushed deleted tracks (pushed=0).
+        /// Returns JSON array or "error:…".
+        /// </summary>
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern FfiString wdmm_deleted_tracks_unpushed();
+
+        /// <summary>
+        /// Mark deleted tracks as pushed by rev.
+        /// <paramref name="revsJson"/> is a JSON array of integers (e.g. "[1,2,3]").
+        /// Returns "ok" or "error:…".
+        /// </summary>
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern FfiString wdmm_deleted_tracks_mark_pushed(IntPtr revsJson);
+
+        /// <summary>
+        /// Purge pushed deleted tracks up to and including the given rev.
+        /// Returns "ok" or "error:…".
+        /// </summary>
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern FfiString wdmm_deleted_tracks_purge_up_to(long upTo);
+
+        /// <summary>
+        /// Get tombstoned remote paths for a source.
+        /// Returns JSON array of strings or "error:…".
+        /// </summary>
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern FfiString wdmm_tombstoned_remote_paths(IntPtr sourceName);
+
+        // ── Sync state (v6 cursors) ───────────────────────────────────────────
+        // Requires wdmm_library_init first.
+
+        /// <summary>
+        /// Get sync state by remote_key.
+        /// Returns JSON object, "null", or "error:…".
+        /// </summary>
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern FfiString wdmm_sync_state_get(IntPtr remoteKey);
+
+        /// <summary>
+        /// Save sync state from JSON.
+        /// Expected fields: {remote_key, last_seq, base_up_to, parts, updated_at}.
+        /// Returns "ok" or "error:…".
+        /// </summary>
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern FfiString wdmm_sync_state_save(IntPtr json);
+
+        /// <summary>
+        /// Clear sync state. <paramref name="prefix"/> is optional (pass IntPtr.Zero to clear all).
+        /// Returns "ok" or "error:…".
+        /// </summary>
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern FfiString wdmm_sync_state_clear(IntPtr prefix);
+
         // ── Playlists (Core 6a02b3b) ──────────────────────────────────────────
         // Requires wdmm_library_init first.
 
@@ -920,6 +999,54 @@ namespace WdmmDesktop.Generated
         /// <summary>Count remaining slices for a CUE album. Returns decimal count string (e.g. "5") or "error:…".</summary>
         public static string CueRemainingSlices(string sourceName, string cueRemotePath)
             => WithNativeString2(sourceName, cueRemotePath, wdmm_cue_remaining_slices);
+
+        // ── Deleted tracks (v6) convenience wrappers ───────────────────────────
+
+        /// <summary>Upsert a deleted track tombstone from JSON. Returns "ok" or "error:…".</summary>
+        public static string DeletedTrackUpsert(string json)
+            => WithNativeString(json, wdmm_deleted_track_upsert);
+
+        /// <summary>Clear a deleted track tombstone by source and path. Returns "ok" or "error:…".</summary>
+        public static string DeletedTrackClear(string sourceName, string remotePath)
+            => WithNativeString2(sourceName, remotePath, wdmm_deleted_track_clear);
+
+        /// <summary>List all deleted tracks. Returns JSON array or "error:…".</summary>
+        public static string DeletedTracksList()
+            => wdmm_deleted_tracks_list().ToStringAndFree();
+
+        /// <summary>List unpushed deleted tracks (pushed=0). Returns JSON array or "error:…".</summary>
+        public static string DeletedTracksUnpushed()
+            => wdmm_deleted_tracks_unpushed().ToStringAndFree();
+
+        /// <summary>Mark deleted tracks as pushed by rev. revsJson is a JSON array of integers (e.g. "[1,2,3]"). Returns "ok" or "error:…".</summary>
+        public static string DeletedTracksMarkPushed(string revsJson)
+            => WithNativeString(revsJson, wdmm_deleted_tracks_mark_pushed);
+
+        /// <summary>Purge pushed deleted tracks up to and including the given rev. Returns "ok" or "error:…".</summary>
+        public static string DeletedTracksPurgeUpTo(long upTo)
+            => wdmm_deleted_tracks_purge_up_to(upTo).ToStringAndFree();
+
+        /// <summary>Get tombstoned remote paths for a source. Returns JSON array of strings or "error:…".</summary>
+        public static string TombstonedRemotePaths(string sourceName)
+            => WithNativeString(sourceName, wdmm_tombstoned_remote_paths);
+
+        // ── Sync state (v6) convenience wrappers ───────────────────────────────
+
+        /// <summary>Get sync state by remote_key. Returns JSON object, "null", or "error:…".</summary>
+        public static string SyncStateGet(string remoteKey)
+            => WithNativeString(remoteKey, wdmm_sync_state_get);
+
+        /// <summary>Save sync state from JSON. Returns "ok" or "error:…".</summary>
+        public static string SyncStateSave(string json)
+            => WithNativeString(json, wdmm_sync_state_save);
+
+        /// <summary>Clear sync state. prefix is optional (pass null or empty to clear all). Returns "ok" or "error:…".</summary>
+        public static string SyncStateClear(string? prefix)
+        {
+            if (string.IsNullOrEmpty(prefix))
+                return wdmm_sync_state_clear(IntPtr.Zero).ToStringAndFree();
+            return WithNativeString(prefix, wdmm_sync_state_clear);
+        }
 
         // ── Playlist convenience wrappers ──────────────────────────────────────
 

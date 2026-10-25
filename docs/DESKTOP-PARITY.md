@@ -109,6 +109,8 @@ Cast / DLNA locked rules (unchanged — mirrors Android):
 | `wdmm_track_delete_by_source` | ✓ | NativeMethods (available; v5 cutover FFI) |
 | `wdmm_library_clear_all` / `_clear_index` | ✓ | NativeMethods (available; v5 cutover FFI) |
 | `wdmm_cue_album_upsert` / `_slice_upsert` / `_slice_delete` / `_album_delete` / `_remaining_slices` | ✓ | NativeMethods (available; v5 cutover FFI; corrected ABI signatures in 42d0a90) |
+| `wdmm_deleted_track_upsert` / `_clear` / `_list` / `_unpushed` / `_mark_pushed` / `_purge_up_to` / `wdmm_tombstoned_remote_paths` | ✓ | NativeMethods (available; v6 tombstone FFI) |
+| `wdmm_sync_state_get` / `_save` / `_clear` | ✓ | NativeMethods (available; v6 sync_state FFI) |
 
 ---
 
@@ -121,7 +123,7 @@ opt-in HTTP surface for external clients (Settings → 第三方/开发者).
 
 ## Submodule
 
-Current SHA pinned: **86f9bd6** (Android binary BK dual-read: Core now reads Android binary backup format on restore; Desktop inherits via FFI).
+Current SHA pinned: **abc1f4a** (v6: deleted_tracks + sync_state tombstone tracking + per-remote sync cursors).
 
 ---
 
@@ -225,6 +227,6 @@ dotnet build -c Debug
 
 ## Settings / Backup / DMR (2026-10-25)
 
-- Core `86f9bd6` (Wave C + Android binary BK dual-read): `wdmm_driver_*`, `wdmm_account_list_dir`, `wdmm_account_*`, `wdmm_backup_*` (WDMMBK01/WDMMEN01, PBKDF2 120k), independent `dmr_prefs.db` + `wdmm_dmr_prefs_*`. Core now dual-reads Android binary BK on restore (Desktop inherits via FFI).
+- Core `abc1f4a` (Wave C + v6 tombstones + sync_state): `wdmm_driver_*`, `wdmm_account_list_dir`, `wdmm_account_*`, `wdmm_backup_*` (WDMMBK01/WDMMEN01, PBKDF2 120k), independent `dmr_prefs.db` + `wdmm_dmr_prefs_*`, `wdmm_deleted_track_*`, `wdmm_sync_state_*`. Core now dual-reads Android binary BK on restore (Desktop inherits via FFI).
 - Desktop: AccountStore; Settings TabView Sync+Backup wired; Cast DMR prefs via FFI (json migrate); Manga write UI; **File source multi-provider via Core account FFI (webdav, baidu_netdisk, 123_open, 115open, aliyundrive_open, terabox, netease_music, ctfile, crypt)**; crypt nested source with real credentials from resolved account.
 - Still out of scope / true blockers: **LocalStream cast needs desktop cloud/crypt drivers (CloudFfi account operations available, but cast glue incomplete)**; local-lib folder mount extras (post-refactor).
