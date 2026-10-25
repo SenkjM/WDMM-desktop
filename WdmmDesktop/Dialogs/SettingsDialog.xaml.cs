@@ -11,7 +11,7 @@ namespace WdmmDesktop.Dialogs
 {
     /// <summary>
     /// Settings dialog — Android settings_screen.dart section parity.
-    /// Sections: 主页与导航 / 媒体库 / 网络库 / 视频·图片·文件 / 杂项 /
+    /// Sections: 主页与导航 / 媒体库 / 文件源 / 视频·图片·文件 / 杂项 /
     /// 同步与备份 / 第三方·开发者(OpenAPI).
     ///
     /// Hard rule: disabled「待 FFI」controls never pretend a save succeeded.
@@ -366,7 +366,7 @@ namespace WdmmDesktop.Dialogs
                 isError: errs.Length > 0);
         }
 
-        // ── Section 3: 网络库 (KV-backed) ─────────────────────────────────────
+        // ── Section 3: 文件源 (KV-backed) ─────────────────────────────────────
 
         private void SaveNetwork2Btn_Click(object sender, RoutedEventArgs e)
         {
