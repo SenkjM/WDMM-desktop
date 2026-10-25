@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -22,6 +23,12 @@ namespace WdmmDesktop.Models
 
         [JsonPropertyName("provider_type")]
         public string ProviderType { get; set; } = "webdav";
+
+        /// <summary>
+        /// Free-form credentials storage (for non-WebDAV providers).
+        /// </summary>
+        [JsonIgnore]
+        public Dictionary<string, JsonElement> Credentials { get; set; } = new();
 
         [JsonIgnore]
         public string Username { get; set; } = "";
@@ -63,9 +70,15 @@ namespace WdmmDesktop.Models
                         var json = Encoding.UTF8.GetString(bytes);
                         using var doc = JsonDocument.Parse(json);
                         var c = doc.RootElement;
+
+                        // WebDAV convenience accessors
                         if (c.TryGetProperty("username", out var u)) a.Username = u.GetString() ?? "";
                         if (c.TryGetProperty("password", out var p)) a.Password = p.GetString() ?? "";
                         if (c.TryGetProperty("remote_dir", out var r)) a.RemoteDir = string.IsNullOrWhiteSpace(r.GetString()) ? "/" : r.GetString()!;
+
+                        // Store all credentials as free-form dictionary
+                        foreach (var prop in c.EnumerateObject())
+                            a.Credentials[prop.Name] = prop.Value.Clone();
                     }
                     catch { /* encrypted or non-JSON credentials — leave blank */ }
                 }
@@ -79,18 +92,44 @@ namespace WdmmDesktop.Models
         /// </summary>
         public string ToUpsertJson()
         {
+            // Build credentials from free-form dictionary if populated, otherwise from WebDAV fields
+            object credentials;
+            if (Credentials.Count > 0)
+            {
+                // Use free-form credentials (for non-WebDAV providers)
+                var credDict = new Dictionary<string, object>();
+                foreach (var kvp in Credentials)
+                {
+                    credDict[kvp.Key] = kvp.Value.ValueKind switch
+                    {
+                        JsonValueKind.String => kvp.Value.GetString(),
+                        JsonValueKind.Number => kvp.Value.TryGetInt64(out var l) ? l : kvp.Value.GetDouble(),
+                        JsonValueKind.True => true,
+                        JsonValueKind.False => false,
+                        JsonValueKind.Null => null,
+                        _ => JsonSerializer.Serialize(kvp.Value)
+                    };
+                }
+                credentials = credDict;
+            }
+            else
+            {
+                // WebDAV convenience fields
+                credentials = new
+                {
+                    username = Username ?? "",
+                    password = Password ?? "",
+                    remote_dir = string.IsNullOrWhiteSpace(RemoteDir) ? "/" : RemoteDir
+                };
+            }
+
             var payload = new
             {
                 id = string.IsNullOrEmpty(Id) ? null : Id,
                 provider_type = string.IsNullOrEmpty(ProviderType) ? "webdav" : ProviderType,
                 display_name = DisplayNameField ?? "",
                 base_url = Url ?? "",
-                credentials = new
-                {
-                    username = Username ?? "",
-                    password = Password ?? "",
-                    remote_dir = string.IsNullOrWhiteSpace(RemoteDir) ? "/" : RemoteDir
-                }
+                credentials
             };
             return JsonSerializer.Serialize(payload);
         }

@@ -98,12 +98,51 @@ namespace WdmmDesktop.Pages
             PathText.Text = CurrentPath;
             UpBtn.IsEnabled = CurrentPath != "/" && CurrentPath.TrimEnd('/') != (_current.RemoteDir?.TrimEnd('/') ?? "");
 
-            string json;
+            List<RemoteEntry> entries;
             try
             {
-                json = await System.Threading.Tasks.Task.Run(() =>
-                    NativeMethods.WithNativeWebDavList(
-                        _current.Url, _current.Username, _current.Password, CurrentPath));
+                if (!string.IsNullOrEmpty(_current.Id))
+                {
+                    // Use account-based FFI for all providers
+                    var items = await System.Threading.Tasks.Task.Run(() =>
+                        CloudFfi.AccountListDir(_current.Id, CurrentPath));
+                    entries = items.Select(i => new RemoteEntry
+                    {
+                        Name = i.Name ?? "",
+                        Path = i.Path ?? "",
+                        IsDir = i.IsDir,
+                        Size = i.Size,
+                        Modified = i.Modified
+                    }).ToList();
+                }
+                else
+                {
+                    // Fallback to WebDAV-specific for legacy accounts without ID
+                    var json = await System.Threading.Tasks.Task.Run(() =>
+                        NativeMethods.WithNativeWebDavList(
+                            _current.Url, _current.Username, _current.Password, CurrentPath));
+
+                    if (json.StartsWith("error:", StringComparison.Ordinal))
+                    {
+                        SetBusy(false);
+                        ShowEmpty(json, showRetry: true);
+                        return;
+                    }
+
+                    entries = new List<RemoteEntry>();
+                    using var doc = JsonDocument.Parse(json);
+                    foreach (var el in doc.RootElement.EnumerateArray())
+                    {
+                        entries.Add(new RemoteEntry
+                        {
+                            Name = el.TryGetProperty("name", out var n) ? n.GetString() ?? "" : "",
+                            Path = el.TryGetProperty("path", out var p) ? p.GetString() ?? "" : "",
+                            IsDir = el.TryGetProperty("is_dir", out var d) && d.GetBoolean(),
+                            Size = el.TryGetProperty("size", out var s) && s.TryGetUInt64(out var sz) ? sz : 0,
+                            Modified = el.TryGetProperty("modified", out var m) && m.ValueKind != JsonValueKind.Null ? m.GetString() : null,
+                        });
+                    }
+                }
             }
             catch (Exception ex)
             {
@@ -113,34 +152,6 @@ namespace WdmmDesktop.Pages
             }
 
             SetBusy(false);
-            if (json.StartsWith("error:", StringComparison.Ordinal))
-            {
-                ShowEmpty(json, showRetry: true);
-                return;
-            }
-
-            var entries = new List<RemoteEntry>();
-            try
-            {
-                using var doc = JsonDocument.Parse(json);
-                foreach (var el in doc.RootElement.EnumerateArray())
-                {
-                    entries.Add(new RemoteEntry
-                    {
-                        Name = el.TryGetProperty("name", out var n) ? n.GetString() ?? "" : "",
-                        Path = el.TryGetProperty("path", out var p) ? p.GetString() ?? "" : "",
-                        IsDir = el.TryGetProperty("is_dir", out var d) && d.GetBoolean(),
-                        Size = el.TryGetProperty("size", out var s) && s.TryGetUInt64(out var sz) ? sz : 0,
-                        Modified = el.TryGetProperty("modified", out var m) && m.ValueKind != JsonValueKind.Null ? m.GetString() : null,
-                    });
-                }
-            }
-            catch (Exception ex)
-            {
-                ShowEmpty(ex.Message, showRetry: true);
-                return;
-            }
-
             entries = entries
                 .OrderByDescending(x => x.IsDir)
                 .ThenBy(x => x.Name, StringComparer.OrdinalIgnoreCase)
@@ -217,11 +228,23 @@ namespace WdmmDesktop.Pages
             var name = (box.Text ?? "").Trim();
             if (string.IsNullOrEmpty(name)) return;
             var path = Combine(CurrentPath, name);
-            var r = NativeMethods.WithNativeWebDavMkdir(_current.Url, _current.Username, _current.Password, path);
-            if (r.StartsWith("error:", StringComparison.Ordinal))
-                ShowEmpty(r, showRetry: true);
-            else
+
+            try
+            {
+                if (!string.IsNullOrEmpty(_current.Id))
+                    CloudFfi.AccountMkdir(_current.Id, path);
+                else
+                {
+                    var r = NativeMethods.WithNativeWebDavMkdir(_current.Url, _current.Username, _current.Password, path);
+                    if (r.StartsWith("error:", StringComparison.Ordinal))
+                        throw new Exception(r.Substring(6));
+                }
                 _ = LoadDirAsync();
+            }
+            catch (Exception ex)
+            {
+                ShowEmpty(ex.Message, showRetry: true);
+            }
         }
 
         async void CtxRename_Click(object sender, RoutedEventArgs e)
@@ -240,11 +263,23 @@ namespace WdmmDesktop.Pages
             var name = (box.Text ?? "").Trim();
             if (string.IsNullOrEmpty(name) || name == ent.Name) return;
             var newPath = Combine(CurrentPath, name);
-            var r = NativeMethods.WithNativeWebDavRename(_current.Url, _current.Username, _current.Password, ent.Path, newPath);
-            if (r.StartsWith("error:", StringComparison.Ordinal))
-                ShowEmpty(r, showRetry: true);
-            else
+
+            try
+            {
+                if (!string.IsNullOrEmpty(_current.Id))
+                    CloudFfi.AccountRename(_current.Id, ent.Path, newPath);
+                else
+                {
+                    var r = NativeMethods.WithNativeWebDavRename(_current.Url, _current.Username, _current.Password, ent.Path, newPath);
+                    if (r.StartsWith("error:", StringComparison.Ordinal))
+                        throw new Exception(r.Substring(6));
+                }
                 _ = LoadDirAsync();
+            }
+            catch (Exception ex)
+            {
+                ShowEmpty(ex.Message, showRetry: true);
+            }
         }
 
         async void CtxDelete_Click(object sender, RoutedEventArgs e)
@@ -259,37 +294,138 @@ namespace WdmmDesktop.Pages
                 XamlRoot = XamlRoot
             };
             if (await dlg.ShowAsync() != ContentDialogResult.Primary) return;
-            var r = NativeMethods.WithNativeWebDavRemove(_current.Url, _current.Username, _current.Password, ent.Path);
-            if (r.StartsWith("error:", StringComparison.Ordinal))
-                ShowEmpty(r, showRetry: true);
-            else
+
+            try
+            {
+                if (!string.IsNullOrEmpty(_current.Id))
+                    CloudFfi.AccountRemove(_current.Id, ent.Path);
+                else
+                {
+                    var r = NativeMethods.WithNativeWebDavRemove(_current.Url, _current.Username, _current.Password, ent.Path);
+                    if (r.StartsWith("error:", StringComparison.Ordinal))
+                        throw new Exception(r.Substring(6));
+                }
                 _ = LoadDirAsync();
+            }
+            catch (Exception ex)
+            {
+                ShowEmpty(ex.Message, showRetry: true);
+            }
         }
 
         async void ManageBtn_Click(object sender, RoutedEventArgs e)
         {
             // Inline manage dialog: list + add/edit/delete via AccountStore (FFI).
-            var panel = new StackPanel { Spacing = 8, MinWidth = 360 };
+            var panel = new StackPanel { Spacing = 8, MinWidth = 480 };
             var list = new ListView { Height = 180 };
             void RefreshList()
             {
                 list.Items.Clear();
                 foreach (var s in AccountStore.List())
-                    list.Items.Add($"{s.DisplayName}  ·  {s.Url}");
+                    list.Items.Add($"{s.DisplayName}  ·  {s.ProviderType}");
             }
             RefreshList();
             panel.Children.Add(list);
 
             var nameBox = new TextBox { PlaceholderText = "display name" };
-            var urlBox = new TextBox { PlaceholderText = "https://nas/dav" };
-            var userBox = new TextBox { PlaceholderText = "username" };
-            var passBox = new PasswordBox();
-            var remoteBox = new TextBox { PlaceholderText = "/", Text = "/" };
+            var providerCombo = new ComboBox { PlaceholderText = "provider", HorizontalAlignment = HorizontalAlignment.Stretch };
+            providerCombo.Items.Add("webdav");
+            providerCombo.Items.Add("baidu_netdisk");
+            providerCombo.Items.Add("123_open");
+            providerCombo.Items.Add("115open");
+            providerCombo.Items.Add("aliyundrive_open");
+            providerCombo.Items.Add("terabox");
+            providerCombo.Items.Add("netease_music");
+            providerCombo.Items.Add("ctfile");
+            providerCombo.Items.Add("crypt");
+            providerCombo.SelectedIndex = 0;
+
             panel.Children.Add(nameBox);
-            panel.Children.Add(urlBox);
-            panel.Children.Add(userBox);
-            panel.Children.Add(passBox);
-            panel.Children.Add(remoteBox);
+            panel.Children.Add(providerCombo);
+
+            // Dynamic credential fields container
+            var credPanel = new StackPanel { Spacing = 6 };
+            panel.Children.Add(credPanel);
+
+            // WebDAV fields (visible by default)
+            var urlBox = new TextBox { PlaceholderText = "https://nas/dav", Tag = "base_url" };
+            var userBox = new TextBox { PlaceholderText = "username", Tag = "username" };
+            var passBox = new PasswordBox { Tag = "password" };
+            var remoteBox = new TextBox { PlaceholderText = "/", Text = "/", Tag = "remote_dir" };
+
+            // Other provider fields (hidden by default)
+            var cookieBox = new TextBox { PlaceholderText = "cookie", Tag = "cookie", Visibility = Visibility.Collapsed };
+            var accessTokenBox = new TextBox { PlaceholderText = "access_token", Tag = "access_token", Visibility = Visibility.Collapsed };
+            var driveIdBox = new TextBox { PlaceholderText = "drive_id", Tag = "drive_id", Visibility = Visibility.Collapsed };
+            var sessionBox = new TextBox { PlaceholderText = "session", Tag = "session", Visibility = Visibility.Collapsed };
+            var cryptPassBox = new PasswordBox { PlaceholderText = "crypt password", Tag = "crypt_password", Visibility = Visibility.Collapsed };
+            var sourceAccountBox = new TextBox { PlaceholderText = "source account name", Tag = "source_account", Visibility = Visibility.Collapsed };
+
+            credPanel.Children.Add(urlBox);
+            credPanel.Children.Add(userBox);
+            credPanel.Children.Add(passBox);
+            credPanel.Children.Add(remoteBox);
+            credPanel.Children.Add(cookieBox);
+            credPanel.Children.Add(accessTokenBox);
+            credPanel.Children.Add(driveIdBox);
+            credPanel.Children.Add(sessionBox);
+            credPanel.Children.Add(cryptPassBox);
+            credPanel.Children.Add(sourceAccountBox);
+
+            void UpdateFieldsForProvider(string provider)
+            {
+                // Hide all
+                urlBox.Visibility = Visibility.Collapsed;
+                userBox.Visibility = Visibility.Collapsed;
+                passBox.Visibility = Visibility.Collapsed;
+                remoteBox.Visibility = Visibility.Collapsed;
+                cookieBox.Visibility = Visibility.Collapsed;
+                accessTokenBox.Visibility = Visibility.Collapsed;
+                driveIdBox.Visibility = Visibility.Collapsed;
+                sessionBox.Visibility = Visibility.Collapsed;
+                cryptPassBox.Visibility = Visibility.Collapsed;
+                sourceAccountBox.Visibility = Visibility.Collapsed;
+
+                switch (provider)
+                {
+                    case "webdav":
+                        urlBox.Visibility = Visibility.Visible;
+                        userBox.Visibility = Visibility.Visible;
+                        passBox.Visibility = Visibility.Visible;
+                        remoteBox.Visibility = Visibility.Visible;
+                        break;
+                    case "baidu_netdisk":
+                    case "terabox":
+                        cookieBox.Visibility = Visibility.Visible;
+                        break;
+                    case "aliyundrive_open":
+                        accessTokenBox.Visibility = Visibility.Visible;
+                        driveIdBox.Visibility = Visibility.Visible;
+                        break;
+                    case "115open":
+                    case "ctfile":
+                        cookieBox.Visibility = Visibility.Visible;
+                        break;
+                    case "123_open":
+                        sessionBox.Visibility = Visibility.Visible;
+                        break;
+                    case "netease_music":
+                        cookieBox.Visibility = Visibility.Visible;
+                        break;
+                    case "crypt":
+                        cryptPassBox.Visibility = Visibility.Visible;
+                        sourceAccountBox.Visibility = Visibility.Visible;
+                        break;
+                }
+            }
+
+            providerCombo.SelectionChanged += (_, __) =>
+            {
+                var provider = providerCombo.SelectedItem?.ToString() ?? "webdav";
+                UpdateFieldsForProvider(provider);
+            };
+
+            UpdateFieldsForProvider("webdav");
 
             var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6 };
             var saveBtn = new Button { Content = "Save" };
@@ -308,20 +444,78 @@ namespace WdmmDesktop.Pages
                 if (i < 0 || i >= all.Count) { editing = null; return; }
                 editing = all[i];
                 nameBox.Text = editing.DisplayNameField;
+                providerCombo.SelectedItem = editing.ProviderType;
+                UpdateFieldsForProvider(editing.ProviderType);
+
+                // Load credentials from free-form dictionary
                 urlBox.Text = editing.Url;
-                userBox.Text = editing.Username;
-                passBox.Password = editing.Password;
-                remoteBox.Text = editing.RemoteDir;
+                if (editing.Credentials.TryGetValue("username", out var u) && u.ValueKind == JsonValueKind.String)
+                    userBox.Text = u.GetString() ?? "";
+                if (editing.Credentials.TryGetValue("password", out var p) && p.ValueKind == JsonValueKind.String)
+                    passBox.Password = p.GetString() ?? "";
+                if (editing.Credentials.TryGetValue("remote_dir", out var r) && r.ValueKind == JsonValueKind.String)
+                    remoteBox.Text = r.GetString() ?? "/";
+                if (editing.Credentials.TryGetValue("cookie", out var c) && c.ValueKind == JsonValueKind.String)
+                    cookieBox.Text = c.GetString() ?? "";
+                if (editing.Credentials.TryGetValue("access_token", out var at) && at.ValueKind == JsonValueKind.String)
+                    accessTokenBox.Text = at.GetString() ?? "";
+                if (editing.Credentials.TryGetValue("drive_id", out var di) && di.ValueKind == JsonValueKind.String)
+                    driveIdBox.Text = di.GetString() ?? "";
+                if (editing.Credentials.TryGetValue("session", out var s) && s.ValueKind == JsonValueKind.String)
+                    sessionBox.Text = s.GetString() ?? "";
+                if (editing.Credentials.TryGetValue("password", out var cp) && cp.ValueKind == JsonValueKind.String && editing.ProviderType == "crypt")
+                    cryptPassBox.Password = cp.GetString() ?? "";
+                if (editing.Credentials.TryGetValue("source", out var sa) && sa.ValueKind == JsonValueKind.Object && sa.TryGetProperty("display_name", out var dn))
+                    sourceAccountBox.Text = dn.GetString() ?? "";
             };
 
             saveBtn.Click += (_, __) =>
             {
                 var a = editing ?? new WebDavAccount();
                 a.DisplayNameField = (nameBox.Text ?? "").Trim();
+                var provider = providerCombo.SelectedItem?.ToString() ?? "webdav";
+                a.ProviderType = provider;
                 a.Url = (urlBox.Text ?? "").Trim();
-                a.Username = (userBox.Text ?? "").Trim();
-                a.Password = passBox.Password ?? "";
-                a.RemoteDir = string.IsNullOrWhiteSpace(remoteBox.Text) ? "/" : remoteBox.Text.Trim();
+
+                // Build credentials based on provider
+                a.Credentials.Clear();
+                switch (provider)
+                {
+                    case "webdav":
+                        a.Credentials["username"] = JsonDocument.Parse($"\"{userBox.Text ?? ""}\"").RootElement;
+                        a.Credentials["password"] = JsonDocument.Parse($"\"{passBox.Password ?? ""}\"").RootElement;
+                        a.Credentials["remote_dir"] = JsonDocument.Parse($"\"{(string.IsNullOrWhiteSpace(remoteBox.Text) ? "/" : remoteBox.Text.Trim())}\"").RootElement;
+                        break;
+                    case "baidu_netdisk":
+                    case "terabox":
+                    case "115open":
+                    case "ctfile":
+                    case "netease_music":
+                        a.Credentials["cookie"] = JsonDocument.Parse($"\"{cookieBox.Text ?? ""}\"").RootElement;
+                        break;
+                    case "aliyundrive_open":
+                        a.Credentials["access_token"] = JsonDocument.Parse($"\"{accessTokenBox.Text ?? ""}\"").RootElement;
+                        a.Credentials["drive_id"] = JsonDocument.Parse($"\"{driveIdBox.Text ?? ""}\"").RootElement;
+                        break;
+                    case "123_open":
+                        a.Credentials["session"] = JsonDocument.Parse($"\"{sessionBox.Text ?? ""}\"").RootElement;
+                        break;
+                    case "crypt":
+                        a.Credentials["password"] = JsonDocument.Parse($"\"{cryptPassBox.Password ?? ""}\"").RootElement;
+                        // TODO: resolve source account by name and build nested source object
+                        var sourceName = sourceAccountBox.Text ?? "";
+                        if (!string.IsNullOrEmpty(sourceName))
+                        {
+                            var sourceAcct = AccountStore.List().FirstOrDefault(x => x.DisplayNameField == sourceName);
+                            if (sourceAcct != null)
+                            {
+                                var sourceJson = $"{{\"provider_type\":\"{sourceAcct.ProviderType}\",\"config\":{{}}}}";
+                                a.Credentials["source"] = JsonDocument.Parse(sourceJson).RootElement;
+                            }
+                        }
+                        break;
+                }
+
                 var r = AccountStore.Upsert(a);
                 status.Text = r.StartsWith("error:", StringComparison.Ordinal) ? r : "ok";
                 if (!r.StartsWith("error:", StringComparison.Ordinal))
