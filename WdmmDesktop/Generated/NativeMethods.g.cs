@@ -1120,6 +1120,119 @@ namespace WdmmDesktop.Generated
         public static string MangaListSeries()
             => wdmm_manga_list_series().ToStringAndFree();
 
+
+        // ── DMR prefs (independent DB) ────────────────────────────────────────
+
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern FfiString wdmm_dmr_prefs_init(IntPtr path);
+
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern FfiString wdmm_dmr_prefs_list();
+
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern FfiString wdmm_dmr_prefs_get(IntPtr usn);
+
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern FfiString wdmm_dmr_prefs_upsert(IntPtr json);
+
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern FfiString wdmm_dmr_prefs_delete(IntPtr usn);
+
+        public static string DmrPrefsInit(string path)
+            => WithNativeString(path, wdmm_dmr_prefs_init);
+
+        public static string DmrPrefsList()
+        {
+            try { return wdmm_dmr_prefs_list().ToStringAndFree(); }
+            catch (Exception ex) { return $"error:{ex.Message}"; }
+        }
+
+        public static string DmrPrefsGet(string usn)
+            => WithNativeString(usn, wdmm_dmr_prefs_get);
+
+        public static string DmrPrefsUpsert(string json)
+            => WithNativeString(json, wdmm_dmr_prefs_upsert);
+
+        public static string DmrPrefsDelete(string usn)
+            => WithNativeString(usn, wdmm_dmr_prefs_delete);
+
+        // ── Backup archive (WDMMBK01 / WDMMEN01) ──────────────────────────────
+
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern FfiString wdmm_backup_create(IntPtr passphrase, IntPtr outPath);
+
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern FfiString wdmm_backup_restore(IntPtr passphrase, IntPtr path);
+
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern FfiString wdmm_backup_upload(
+            IntPtr webdavUrl, IntPtr webdavUser, IntPtr webdavPass,
+            IntPtr remoteDir, IntPtr passphrase);
+
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern FfiString wdmm_backup_list(
+            IntPtr webdavUrl, IntPtr webdavUser, IntPtr webdavPass, IntPtr remoteDir);
+
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern FfiString wdmm_backup_download_restore(
+            IntPtr webdavUrl, IntPtr webdavUser, IntPtr webdavPass,
+            IntPtr remoteFile, IntPtr passphrase);
+
+        public static string BackupCreate(string passphrase, string outPath)
+        {
+            var p1 = Utf8Z(passphrase); var p2 = Utf8Z(outPath);
+            try { return wdmm_backup_create(p1, p2).ToStringAndFree(); }
+            finally { Marshal.FreeHGlobal(p1); Marshal.FreeHGlobal(p2); }
+        }
+
+        public static string BackupRestore(string passphrase, string path)
+        {
+            var p1 = Utf8Z(passphrase); var p2 = Utf8Z(path);
+            try { return wdmm_backup_restore(p1, p2).ToStringAndFree(); }
+            finally { Marshal.FreeHGlobal(p1); Marshal.FreeHGlobal(p2); }
+        }
+
+        public static string BackupUpload(
+            string webdavUrl, string webdavUser, string webdavPass,
+            string remoteDir, string passphrase)
+        {
+            var p1 = Utf8Z(webdavUrl); var p2 = Utf8Z(webdavUser);
+            var p3 = Utf8Z(webdavPass); var p4 = Utf8Z(remoteDir); var p5 = Utf8Z(passphrase);
+            try { return wdmm_backup_upload(p1, p2, p3, p4, p5).ToStringAndFree(); }
+            finally
+            {
+                Marshal.FreeHGlobal(p1); Marshal.FreeHGlobal(p2); Marshal.FreeHGlobal(p3);
+                Marshal.FreeHGlobal(p4); Marshal.FreeHGlobal(p5);
+            }
+        }
+
+        public static string BackupList(
+            string webdavUrl, string webdavUser, string webdavPass, string remoteDir)
+        {
+            var p1 = Utf8Z(webdavUrl); var p2 = Utf8Z(webdavUser);
+            var p3 = Utf8Z(webdavPass); var p4 = Utf8Z(remoteDir);
+            try { return wdmm_backup_list(p1, p2, p3, p4).ToStringAndFree(); }
+            finally
+            {
+                Marshal.FreeHGlobal(p1); Marshal.FreeHGlobal(p2);
+                Marshal.FreeHGlobal(p3); Marshal.FreeHGlobal(p4);
+            }
+        }
+
+        public static string BackupDownloadRestore(
+            string webdavUrl, string webdavUser, string webdavPass,
+            string remoteFile, string passphrase)
+        {
+            var p1 = Utf8Z(webdavUrl); var p2 = Utf8Z(webdavUser);
+            var p3 = Utf8Z(webdavPass); var p4 = Utf8Z(remoteFile); var p5 = Utf8Z(passphrase);
+            try { return wdmm_backup_download_restore(p1, p2, p3, p4, p5).ToStringAndFree(); }
+            finally
+            {
+                Marshal.FreeHGlobal(p1); Marshal.FreeHGlobal(p2); Marshal.FreeHGlobal(p3);
+                Marshal.FreeHGlobal(p4); Marshal.FreeHGlobal(p5);
+            }
+        }
+
         // ── Queue concurrency convenience wrappers ────────────────────────────
 
         /// <summary>Return the current queue concurrency limit (1–8).</summary>
