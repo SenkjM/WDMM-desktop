@@ -49,7 +49,8 @@ namespace WdmmDesktop.Pages
                 "              Queue concurrency slider live Wave D (Core fdb05df)\n"     +
                 "Tasks      done   — wdmm_queue_status_json / cancel (FFI)\n"             +
                 "File source done — dir browse via wdmm_webdav_*; sources via wdmm_account_*\n"     +
-                "Settings   done   — TabView; Sync KV Android-shaped + sync_trigger\n" +
+                "Settings   done   — TabView; Sync KV + sync_trigger + backup FFI\n" +
+                "Cast prefs done   — wdmm_dmr_prefs_* (Core dmr_prefs.db)\n" +
                 "Manga      done   — list/get/pages + upsert/set_progress/delete (FFI)\n" +
                 "              list + detail via wdmm_manga_get / list_pages\n"                      +
                 "OpenAPI    opt-in — third-party only (Settings → 第三方/开发者)\n"      +

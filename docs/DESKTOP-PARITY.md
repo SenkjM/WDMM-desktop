@@ -43,8 +43,8 @@ Chrome rules are unchanged from the shell demo:
 | **Manga** | **real** | `wdmm_manga_list` / `_get` / `_list_pages` / `_list_progress` read; detail dialog writes via `wdmm_manga_upsert` / `_set_progress` / `_delete`. |
 | **File source (Network)** | **real** | Directory browse via `wdmm_webdav_list/mkdir/rename/remove`; sources via `wdmm_account_*`; remember-path settings FFI; Settings sync uses selected source + `wdmm_sync_trigger`. i18n zh/en via Loc + Resources.resw. |
 | **Tasks** | **real** | Queue list from `wdmm_queue_status_json()`. Pending count badge. Per-task cancel via `wdmm_queue_cancel`. |
-| **Cast / DLNA** | **real** | DMR discovery via `wdmm_dlna_discover_json(2000 ms)`. USN-keyed compat prefs persisted to `%LOCALAPPDATA%\Wdmm\dmr_prefs.json`. Proxy-only cast enforced. Single-file mutex (HLS tokens via `ProxyUnregisterHls`, file tokens via `ProxyUnregister`). HLS: **unlocked** — `ProxyRegisterHls(device_id: Usn, filePath)` (wdmm-core e236ece). LocalFile→register_file or register_hls. LocalStream hook prepared — refuses until cloud/crypt drivers exist. NetworkDirect refuses (cache first). No silent HLS↔direct fallback. `ContentDeliveryKind` model wired. |
-| **Settings** | **real** | TabView chrome (920×640). Sync & backup Android-shaped: `sync_remote_root` / `sync_interval` / `playlist_sync_enabled` / `sync_encrypt_password` KV + `wdmm_sync_trigger` (no backup archive — no FFI). Sources via `wdmm_account_*`. Library `media_scan_*`. OpenAPI third-party only. |
+| **Cast / DLNA** | **real** | DMR discovery via `wdmm_dlna_discover_json(2000 ms)`. USN-keyed prefs in Core independent `dmr_prefs.db` via `wdmm_dmr_prefs_*` (`force_direct` + `override_name`); one-shot migrate from legacy `dmr_prefs.json` → `.bak`. Proxy-only cast; single-file mutex; HLS unlocked. LocalStream refuses until cloud/crypt drivers. NetworkDirect refuses (cache first). No silent HLS↔direct fallback. |
+| **Settings** | **real** | TabView chrome (920×640). Sync: `sync_remote_root` / `sync_interval` / `playlist_sync_enabled` / `sync_encrypt_password` KV + `wdmm_sync_trigger`. Backup: passphrase + `backup_remote_path` + `wdmm_backup_upload` / `_list` / `_download_restore` (WDMMBK01/WDMMEN01). Sources via `wdmm_account_*`. Library `media_scan_*`. OpenAPI third-party only. |
 | **About** | **real** | `wdmm_version()`, OpenAPI running status + port, parity matrix summary. |
 
 ---
@@ -67,7 +67,7 @@ Cast / DLNA locked rules (unchanged — mirrors Android):
 1. **DLNA → proxy only.** The proxy URL is sent to the renderer; raw `file://` or direct path never passed.
 2. **Single-file mutex.** Previous token unregistered before a new one is registered. HLS tokens use `ProxyUnregisterHls`; file tokens use `ProxyUnregister`.
 3. **No auto HLS ↔ direct fallback.** The user's per-DMR `ForceDirect` choice is honoured verbatim.
-4. **USN-keyed DMR preferences** — persisted to `%LOCALAPPDATA%\Wdmm\dmr_prefs.json`.
+4. **USN-keyed DMR preferences** — Core `dmr_prefs.db` via `wdmm_dmr_prefs_*` (legacy JSON migrated once).
 5. **HLS mode is live.** `wdmm_proxy_register_hls` / `_unregister_hls` / `_hls_seek` wired and exposed via safe C# wrappers.
 
 ---
@@ -93,6 +93,8 @@ Cast / DLNA locked rules (unchanged — mirrors Android):
 | `wdmm_proxy_register_file` | ✓ | CastPage (ForceDirect=true) |
 | `wdmm_proxy_unregister` | ✓ | CastPage (single-file mutex, file tokens) |
 | `wdmm_sync_trigger` | ✓ | SettingsDialog Sync & backup |
+| `wdmm_backup_create` / `_restore` / `_upload` / `_list` / `_download_restore` | ✓ | SettingsDialog Sync & backup |
+| `wdmm_dmr_prefs_init` / `_list` / `_get` / `_upsert` / `_delete` | ✓ | DmrPrefsStore → CastDialog / DmrInfoDialog |
 | `wdmm_proxy_register_hls` | ✓ | CastPage (ForceDirect=false, HLS transcode) |
 | `wdmm_proxy_unregister_hls` | ✓ | CastPage (single-file mutex, HLS tokens) |
 | `wdmm_proxy_hls_seek` | ✓ | NativeMethods (wrapper present; cast UI may not call yet) |
@@ -101,34 +103,21 @@ Cast / DLNA locked rules (unchanged — mirrors Android):
 | `wdmm_proxy_renew_stream_callback` | ✓ | NativeMethods (binding + wrapper present) |
 | `wdmm_webdav_list` / `_mkdir` / `_rename` / `_remove` | ✓ | NetworkPage (File source) |
 | `wdmm_account_list` / `_get` / `_upsert` / `_delete` | ✓ | AccountStore → NetworkPage + Settings sync picker |
-| `wdmm_playlist_list` / `_save` | **TODO** | PlaylistsPage (currently: OpenAPI bridge) |
-| `wdmm_manga_*` | check submodule | MangaPage (Wave D on Core; Desktop cutover separate) |
+| `wdmm_playlist_list` / `_create` / `_delete` / `_list_entries` / `_set_entries` | ✓ | PlaylistsPage (FFI) |
+| `wdmm_manga_*` | ✓ | MangaPage read + upsert/set_progress/delete |
 
 ---
 
-## OpenAPI Bridge (Playlists)
+## OpenAPI (third-party only)
 
-PlaylistsPage connects via HttpClient to `http://127.0.0.1:{port}/v1/playlists` when the
-OpenAPI server is running (started from Settings). This is the interim path until
-`wdmm_playlist_list` / `wdmm_playlist_save` are exported by wdmm-core.
-
-Routes used:
-- `GET  /v1/playlists`        → list all playlists (`{"playlists":[…]}`)
-- `POST /v1/playlists`        → create (`{"name":"…"}` → 201 `{"id":…,"name":…,…}`)
-- `GET  /v1/playlists/:id/entries` → list entries (`{"entries":[…]}`)
-- `DELETE /v1/playlists/:id`  → delete + cascade entries (204)
-
-All requests carry `Authorization: Bearer {TokenGet()}`.
+Playlists / library / accounts are Desktop-internal via FFI. OpenAPI remains an
+opt-in HTTP surface for external clients (Settings → 第三方/开发者).
 
 ---
 
 ## Submodule
 
-Current SHA pinned in worktree: **e236ece28c0bb5b9a080ea9e53936ef6e5d0d961** (P0.5 — proxy delivery + HLS FFI)
-
-Previous SHA: `d8b22178049d800ecfa4f4ad0879e0372ac33f71` (Round 10)
-Then uncomment the `wdmm_proxy_start_hls` / `wdmm_proxy_stop_hls` P/Invoke declarations in
-`WdmmDesktop/Generated/NativeMethods.g.cs` and remove the HLS guard in `CastPage.CastBtn_Click`.
+Current SHA pinned: **9d01e09** (`wdmm_backup_*` + `wdmm_dmr_prefs_*` on Core main).
 
 ---
 
@@ -140,7 +129,8 @@ Files written to `%LOCALAPPDATA%\Wdmm\`:
 |---|---|---|
 | `library.db` | SQLite library (managed by Rust) | already FFI |
 | ~~`accounts.json`~~ | sources now in Core DB | `wdmm_account_*` via AccountStore |
-| `dmr_prefs.json` | Per-USN DMR compat prefs | `wdmm_dmr_pref_*` exported |
+| `dmr_prefs.db` | Per-USN DMR prefs (Core) | `wdmm_dmr_prefs_*` via DmrPrefsStore |
+| ~~`dmr_prefs.json`~~ | legacy; migrated once → `.bak` | — |
 
 ---
 
@@ -217,17 +207,19 @@ dotnet build -c Debug
 
 | Blocker | Unblocked by |
 |---|---|
-| Playlists direct FFI (`wdmm_playlist_list`) | wdmm-core exports FFI; replace OpenAPI bridge |
-| Manga library (`wdmm_manga_list` / `_chapters`) | wdmm-core adds CRUD + FFI export |
+| Playlists direct FFI | **DONE** — `wdmm_playlist_*` |
+| Manga library | **DONE** — read + upsert/set_progress/delete |
 | Cast HLS mode (`wdmm_proxy_register_hls`) | **DONE** — wired in P0.5 (wdmm-core e236ece) |
+| Backup archive FFI | **DONE** — Settings Sync tab + Core `9d01e09` |
+| DMR prefs Core store | **DONE** — `dmr_prefs.db` + CastDialog |
 | LocalStream cast (`wdmm_proxy_register_stream`) | Bindings + hook present; needs desktop cloud/crypt driver |
 | Sidebar animation | Polish (DoubleAnimation on SidebarColumn.Width) — not parity-blocking |
 | Sidebar state persistence | Persist last destination + expand/collapse across launches |
 
 ---
 
-## Settings / Account FFI (2026-10-25)
+## Settings / Backup / DMR (2026-10-25)
 
-- Core `be6565a`: `wdmm_account_*` CRUD; `wdmm_sync_trigger` uses global library DB (not `:memory:`).
-- Desktop: AccountStore + migrate off `accounts.json`; Settings TabView; Sync KV keys aligned with Android `sync_screen.dart`; Manga write UI.
-- Still deferred: backup archive FFI, local-lib folder mount extras, DMR prefs Core store (local `dmr_prefs.json` until merged).
+- Core `9d01e09`: `wdmm_account_*`, `wdmm_backup_*` (WDMMBK01/WDMMEN01, PBKDF2 120k), independent `dmr_prefs.db` + `wdmm_dmr_prefs_*`.
+- Desktop: AccountStore; Settings TabView Sync+Backup wired; Cast DMR prefs via FFI (json migrate); Manga write UI; File source browse FFI.
+- Still out of scope / true blockers: full Android binary vault/playlist section shapes may not round-trip with Core JSON BK sections; LocalStream cast needs desktop cloud/crypt drivers; local-lib folder mount extras (post-refactor).
