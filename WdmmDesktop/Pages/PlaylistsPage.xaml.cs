@@ -1,11 +1,6 @@
 using System;
 using System.Collections.Generic;
-using System.Net.Http;
-using System.Net.Http.Headers;
-using System.Text;
 using System.Text.Json;
-using System.Text.Json.Serialization;
-using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Navigation;
@@ -14,13 +9,13 @@ using WdmmDesktop.Models;
 
 namespace WdmmDesktop.Pages
 {
-    // Preferred long-term path: replace all HTTP calls here with wdmm_playlist_list /
-    // wdmm_playlist_save FFI once wdmm-core exports them (not present at d8b2217).
-    // Until then we bridge through the local OpenAPI server at 127.0.0.1:{port}.
+    /// <summary>
+    /// Playlists page — FFI only.
+    /// All read/write goes through NativeMethods.PlaylistList / PlaylistCreate /
+    /// PlaylistDelete / PlaylistListEntries. No OpenAPI HTTP, no HttpClient.
+    /// </summary>
     public sealed partial class PlaylistsPage : Page
     {
-        private static readonly HttpClient _http = new();
-
         private string? _selectedPlaylistId;
 
         public PlaylistsPage() => InitializeComponent();
@@ -28,172 +23,106 @@ namespace WdmmDesktop.Pages
         protected override void OnNavigatedTo(NavigationEventArgs e)
         {
             base.OnNavigatedTo(e);
-            _ = RefreshAsync();
-        }
-
-        // ── Server guard ──────────────────────────────────────────────────────
-
-        /// <summary>Returns (running, port, token). Never throws.</summary>
-        private static (bool running, int port, string token) GetServerState()
-        {
-            try
-            {
-                bool running = NativeMethods.IsOpenApiRunning();
-                int  port    = NativeMethods.OpenApiPort();
-                string token = NativeMethods.TokenGet();
-                return (running, port, token);
-            }
-            catch
-            {
-                // FFI DLL absent on Linux dev box — tolerate.
-                return (false, -1, "");
-            }
+            Refresh();
         }
 
         // ── Data loading ──────────────────────────────────────────────────────
 
-        private async Task RefreshAsync()
+        private void Refresh()
         {
-            var (running, port, token) = GetServerState();
-
-            ServerInfoBar.IsOpen = !running;
-            MainGrid.IsEnabled   = running;
-
-            if (!running)
+            List<PlaylistItem> lists;
+            try
             {
+                var json = NativeMethods.PlaylistList();
+                if (json.StartsWith("error:"))
+                {
+                    StatusBar.Text = json;
+                    PlaylistList.Items.Clear();
+                    _selectedPlaylistId = null;
+                    UpdateDetailTitle(null);
+                    return;
+                }
+                lists = JsonSerializer.Deserialize<List<PlaylistItem>>(json)
+                        ?? new List<PlaylistItem>();
+            }
+            catch (Exception ex)
+            {
+                // FFI not loaded (Linux dev box) or library not initialised.
+                StatusBar.Text = $"Load failed: {ex.Message}";
                 PlaylistList.Items.Clear();
-                EntryList.Items.Clear();
                 _selectedPlaylistId = null;
                 UpdateDetailTitle(null);
                 return;
             }
 
-            StatusBar.Text = "Loading…";
-            try
-            {
-                var lists = await GetPlaylistsAsync(port, token);
-                PlaylistList.Items.Clear();
-                foreach (var pl in lists)
-                    PlaylistList.Items.Add(pl);
+            PlaylistList.Items.Clear();
+            foreach (var pl in lists)
+                PlaylistList.Items.Add(pl);
 
-                StatusBar.Text = lists.Count == 0
-                    ? "No playlists yet — click + to create one."
-                    : $"{lists.Count} playlist{(lists.Count == 1 ? "" : "s")}";
-            }
-            catch (Exception ex)
-            {
-                StatusBar.Text = $"Error loading playlists: {ex.Message}";
-            }
+            StatusBar.Text = lists.Count == 0
+                ? "No playlists yet — click + to create one."
+                : $"{lists.Count} playlist{(lists.Count == 1 ? "" : "s")}";
+
+            // Clear detail pane.
+            _selectedPlaylistId = null;
+            DeleteBtn.IsEnabled = false;
+            EntryList.Items.Clear();
+            EntryEmptyState.Visibility = Visibility.Collapsed;
+            UpdateDetailTitle(null);
         }
 
-        private async Task LoadEntriesAsync(string playlistId, string name, int port, string token)
+        private void LoadEntries(string playlistId, string name)
         {
             EntryList.Items.Clear();
             EntryEmptyState.Visibility = Visibility.Collapsed;
             UpdateDetailTitle(name);
 
+            List<PlaylistEntryItem> entries;
             try
             {
-                var entries = await GetEntriesAsync(playlistId, port, token);
-                if (entries.Count == 0)
+                var json = NativeMethods.PlaylistListEntries(playlistId);
+                if (json.StartsWith("error:"))
                 {
                     EntryEmptyState.Visibility = Visibility.Visible;
-                    EntryEmptyText.Text = "No entries in this playlist.";
+                    EntryEmptyText.Text = json;
+                    return;
                 }
-                else
-                {
-                    foreach (var e in entries)
-                        EntryList.Items.Add(e);
-                }
+                entries = JsonSerializer.Deserialize<List<PlaylistEntryItem>>(json)
+                          ?? new List<PlaylistEntryItem>();
             }
             catch (Exception ex)
             {
                 EntryEmptyState.Visibility = Visibility.Visible;
                 EntryEmptyText.Text = $"Error loading entries: {ex.Message}";
+                return;
             }
-        }
 
-        // ── HTTP helpers ──────────────────────────────────────────────────────
-
-        private static HttpRequestMessage BuildRequest(
-            HttpMethod method, string url, string token, object? body = null)
-        {
-            var req = new HttpRequestMessage(method, url);
-            req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
-            if (body != null)
+            if (entries.Count == 0)
             {
-                var json = JsonSerializer.Serialize(body);
-                req.Content = new StringContent(json, Encoding.UTF8, "application/json");
+                EntryEmptyState.Visibility = Visibility.Visible;
+                EntryEmptyText.Text = "No entries in this playlist.";
             }
-            return req;
-        }
-
-        private static async Task<List<PlaylistItem>> GetPlaylistsAsync(int port, string token)
-        {
-            var url  = $"http://127.0.0.1:{port}/v1/playlists";
-            var resp = await _http.SendAsync(BuildRequest(HttpMethod.Get, url, token));
-            resp.EnsureSuccessStatusCode();
-            var body = await resp.Content.ReadAsStringAsync();
-            using var doc = JsonDocument.Parse(body);
-            var arr = doc.RootElement.GetProperty("playlists");
-            return JsonSerializer.Deserialize<List<PlaylistItem>>(arr.GetRawText())
-                   ?? new List<PlaylistItem>();
-        }
-
-        private static async Task<List<PlaylistEntryItem>> GetEntriesAsync(
-            string id, int port, string token)
-        {
-            var url  = $"http://127.0.0.1:{port}/v1/playlists/{Uri.EscapeDataString(id)}/entries";
-            var resp = await _http.SendAsync(BuildRequest(HttpMethod.Get, url, token));
-            resp.EnsureSuccessStatusCode();
-            var body = await resp.Content.ReadAsStringAsync();
-            using var doc = JsonDocument.Parse(body);
-            var arr = doc.RootElement.GetProperty("entries");
-            return JsonSerializer.Deserialize<List<PlaylistEntryItem>>(arr.GetRawText())
-                   ?? new List<PlaylistEntryItem>();
-        }
-
-        private static async Task<PlaylistItem> CreatePlaylistAsync(
-            string name, int port, string token)
-        {
-            var url  = $"http://127.0.0.1:{port}/v1/playlists";
-            var resp = await _http.SendAsync(
-                BuildRequest(HttpMethod.Post, url, token, new { name }));
-            resp.EnsureSuccessStatusCode(); // 201
-            var body = await resp.Content.ReadAsStringAsync();
-            return JsonSerializer.Deserialize<PlaylistItem>(body)
-                   ?? throw new InvalidOperationException("Empty response from server.");
-        }
-
-        private static async Task DeletePlaylistAsync(string id, int port, string token)
-        {
-            var url  = $"http://127.0.0.1:{port}/v1/playlists/{Uri.EscapeDataString(id)}";
-            var resp = await _http.SendAsync(BuildRequest(HttpMethod.Delete, url, token));
-            resp.EnsureSuccessStatusCode(); // 204
+            else
+            {
+                foreach (var e in entries)
+                    EntryList.Items.Add(e);
+            }
         }
 
         // ── Event handlers ────────────────────────────────────────────────────
 
-        private void RefreshBtn_Click(object sender, RoutedEventArgs e)
-            => _ = RefreshAsync();
+        private void RefreshBtn_Click(object sender, RoutedEventArgs e) => Refresh();
 
         private void PlaylistList_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             if (PlaylistList.SelectedItem is not PlaylistItem pl) return;
             _selectedPlaylistId = pl.Id;
             DeleteBtn.IsEnabled = true;
-
-            var (running, port, token) = GetServerState();
-            if (running)
-                _ = LoadEntriesAsync(pl.Id, pl.Name, port, token);
+            LoadEntries(pl.Id, pl.Name);
         }
 
         private async void AddBtn_Click(object sender, RoutedEventArgs e)
         {
-            var (running, port, token) = GetServerState();
-            if (!running) { ServerInfoBar.IsOpen = true; return; }
-
-            // Name input dialog
             var nameBox = new TextBox { PlaceholderText = "Playlist name", MinWidth = 260 };
             var dlg = new ContentDialog
             {
@@ -211,10 +140,19 @@ namespace WdmmDesktop.Pages
 
             try
             {
-                var created = await CreatePlaylistAsync(name, port, token);
-                PlaylistList.Items.Add(created);
-                PlaylistList.SelectedItem = created;
-                StatusBar.Text = $"Created \"{created.Name}\"";
+                var createJson = $"{{\"name\":\"{EscapeJson(name)}\"}}";
+                var result = NativeMethods.PlaylistCreate(createJson);
+                if (result.StartsWith("error:"))
+                {
+                    StatusBar.Text = result;
+                    return;
+                }
+
+                var created = JsonSerializer.Deserialize<PlaylistItem>(result);
+                StatusBar.Text = created != null
+                    ? $"Created \"{created.Name}\""
+                    : "Playlist created.";
+                Refresh();
             }
             catch (Exception ex)
             {
@@ -225,31 +163,31 @@ namespace WdmmDesktop.Pages
         private async void DeleteBtn_Click(object sender, RoutedEventArgs e)
         {
             if (_selectedPlaylistId == null) return;
-            var (running, port, token) = GetServerState();
-            if (!running) { ServerInfoBar.IsOpen = true; return; }
-
             var pl = PlaylistList.SelectedItem as PlaylistItem;
+
             var dlg = new ContentDialog
             {
                 Title             = "Delete Playlist",
                 Content           = $"Delete \"{pl?.Name ?? _selectedPlaylistId}\"? This cannot be undone.",
                 PrimaryButtonText = "Delete",
                 CloseButtonText   = "Cancel",
-                XamlRoot          = XamlRoot
+                XamlRoot          = XamlRoot,
+                DefaultButton     = ContentDialogButton.Close
             };
 
             if (await dlg.ShowAsync() != ContentDialogResult.Primary) return;
 
             try
             {
-                await DeletePlaylistAsync(_selectedPlaylistId, port, token);
-                PlaylistList.Items.Remove(pl);
-                _selectedPlaylistId = null;
-                DeleteBtn.IsEnabled = false;
-                EntryList.Items.Clear();
-                EntryEmptyState.Visibility = Visibility.Collapsed;
-                UpdateDetailTitle(null);
+                var result = NativeMethods.PlaylistDelete(_selectedPlaylistId);
+                if (result.StartsWith("error:"))
+                {
+                    StatusBar.Text = $"Delete failed ({result}).";
+                    return;
+                }
+
                 StatusBar.Text = "Playlist deleted.";
+                Refresh();
             }
             catch (Exception ex)
             {
@@ -258,6 +196,9 @@ namespace WdmmDesktop.Pages
         }
 
         // ── Helpers ───────────────────────────────────────────────────────────
+
+        private static string EscapeJson(string s)
+            => s.Replace("\\", "\\\\").Replace("\"", "\\\"");
 
         private void UpdateDetailTitle(string? name)
             => DetailTitle.Text = name ?? "Select a playlist";

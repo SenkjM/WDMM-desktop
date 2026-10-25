@@ -35,23 +35,21 @@ namespace WdmmDesktop.Pages
                 ApiPortText.Text   = "";
             }
 
-            // Parity matrix — keep in sync with docs/DESKTOP-PARITY.md
+            // Parity matrix — honest done / in progress / blocked.
+            // Keep in sync with docs/DESKTOP-PARITY.md. Never mark stubs as real.
             ParityText.Text =
-                "Folders    part  — local browser (path bar, Up, double-click);\n"     +
-                "              remote: BLOCKED wdmm_webdav_list not in FFI @ d8b2217\n" +
-                "Music      real  — wdmm_track_list / search\n"                         +
-                "Playlists  bridge— OpenAPI GET/POST/DELETE /v1/playlists;\n"           +
-                "              direct FFI wdmm_playlist_list not yet exported\n"        +
-                "Manga      stub  — BLOCKED wdmm_manga_list / chapter APIs not in\n"   +
-                "              FFI or OpenAPI @ d8b2217; storage tables exist\n"        +
-                "Network    part  — wdmm_sync_trigger; account CRUD local JSON\n"      +
-                "Tasks      real  — wdmm_queue_status_json / cancel\n"                  +
-                "Cast/DLNA  real  — wdmm_dlna_discover_json / wdmm_dlna_cast\n"        +
-                "              HLS: ProxyRegisterHls (wdmm-core e236ece)\n"            +
-                "              LocalStream hook prepared (no desktop drivers yet)\n"   +
-                "              NetworkDirect refuses (cache file first)\n"             +
-                "Settings   real  — wdmm_openapi_start / token_get / token_rotate\n"   +
-                "About      real  — wdmm_version";
+                "Folders    done   — user-folder tree via FFI (我的文件夹 root)\n"     +
+                "Playlists  done   — FFI (PlaylistList/Create/Delete/ListEntries)\n"    +
+                "              no OpenAPI on this path\n"                                +
+                "Music      done   — wdmm_track_list / search (FFI)\n"                  +
+                "Cast       done   — CastDialog (device picker), no nav tab\n"          +
+                "              DLNA→proxy only, single-file mutex, USN prefs\n"        +
+                "Settings   part   — 7 sections; Home/Theme/Sync live, others 待 FFI\n" +
+                "Tasks      done   — wdmm_queue_status_json / cancel (FFI)\n"            +
+                "Network    part   — wdmm_sync_trigger; accounts local JSON\n"          +
+                "Manga      blocked— no manga FFI (wdmm_manga_* not exported)\n"        +
+                "OpenAPI    opt-in — third-party only (Settings → 第三方/开发者)\n"     +
+                "Local-lib  n/a    — post-Rust-refactor feature; out of scope now";
         }
     }
 }

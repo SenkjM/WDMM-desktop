@@ -4,14 +4,14 @@ namespace WdmmDesktop
 {
     /// <summary>
     /// Lightweight cross-page state container.
-    /// Holding PendingCastTrack here avoids threading navigation parameters through
-    /// the Frame just to pass a single selected track from MusicPage to CastPage.
+    /// PendingCastTrack is retained for callers that still set it before opening
+    /// Dialogs/CastDialog; MusicPage now passes the track to CastDialog directly.
     /// </summary>
     internal static class AppState
     {
         /// <summary>
-        /// Track selected for casting from MusicPage (or null if none queued).
-        /// CastPage consumes and clears it on first load.
+        /// Optional track queued for casting (legacy hand-off). Prefer passing
+        /// the track into CastDialog's constructor.
         /// </summary>
         public static TrackItem? PendingCastTrack { get; set; }
     }

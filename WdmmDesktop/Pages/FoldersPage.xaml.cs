@@ -1,168 +1,373 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Navigation;
+using WdmmDesktop.Generated;
 
 namespace WdmmDesktop.Pages
 {
+    /// <summary>
+    /// Folders page — Android user-folder tree (我的文件夹 virtual root).
+    /// Data comes exclusively from wdmm_user_folder_list_children / _create /
+    /// _rename / _delete / _list_items FFI. No OS path browsing.
+    /// </summary>
     public sealed partial class FoldersPage : Page
     {
-        // Local browser only. Remote WebDAV listing is blocked until
-        // wdmm-core exports wdmm_webdav_list (not present at d8b2217).
-        // When it lands, replace the RemoteBlockedBar with a real tree driven by that FFI.
-        private string _currentPath = string.Empty;
+        // ── Breadcrumb stack ─────────────────────────────────────────────────
+        // Each entry is (id, displayName). null id = virtual root.
+        private readonly List<(string? Id, string Name)> _crumbs = new();
 
         public FoldersPage() => InitializeComponent();
 
         protected override void OnNavigatedTo(NavigationEventArgs e)
         {
             base.OnNavigatedTo(e);
-            // Default to the user's home so the page is immediately useful.
-            NavigateTo(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile));
-        }
-
-        // ── Source toggle ─────────────────────────────────────────────────────
-
-        private void SourceToggle_Toggled(object sender, RoutedEventArgs e)
-        {
-            bool remote = SourceToggle.IsOn;
-
-            // Show/hide the appropriate panel.
-            LocalGrid.Visibility        = remote ? Visibility.Collapsed : Visibility.Visible;
-            RemoteBlockedBar.Visibility = remote ? Visibility.Visible   : Visibility.Collapsed;
-            RemoteBlockedBar.IsOpen     = remote;
-
-            if (remote)
-                StatusBar.Text = "";
-            else
-                // Refresh the local view when switching back.
-                NavigateTo(_currentPath);
-        }
-
-        // ── Path bar ──────────────────────────────────────────────────────────
-
-        private void PathBox_KeyDown(object sender, KeyRoutedEventArgs e)
-        {
-            if (e.Key == Windows.System.VirtualKey.Enter)
-                NavigateTo(PathBox.Text.Trim());
-        }
-
-        private void BrowseBtn_Click(object sender, RoutedEventArgs e)
-        {
-            NavigateTo(PathBox.Text.Trim());
-        }
-
-        private void UpBtn_Click(object sender, RoutedEventArgs e)
-        {
-            var parent = Directory.GetParent(_currentPath);
-            if (parent != null) NavigateTo(parent.FullName);
-        }
-
-        private void ItemsList_DoubleTapped(object sender, DoubleTappedRoutedEventArgs e)
-        {
-            if (ItemsList.SelectedItem is FileEntry fe && fe.IsDirectory)
-                NavigateTo(fe.FullPath);
+            // Always start at the virtual root on first load.
+            NavigateTo(folderId: null, folderName: "我的文件夹");
         }
 
         // ── Navigation ────────────────────────────────────────────────────────
 
-        private void NavigateTo(string path)
+        private void NavigateTo(string? folderId, string folderName)
+        {
+            // Update crumb stack: if folderId is already in stack, pop back to it.
+            // Otherwise push it.
+            if (folderId == null)
+            {
+                _crumbs.Clear();
+                _crumbs.Add((null, "我的文件夹"));
+            }
+            else
+            {
+                // Check whether target is already in the stack (navigating backward).
+                int idx = _crumbs.FindIndex(c => c.Id == folderId);
+                if (idx >= 0)
+                    _crumbs.RemoveRange(idx + 1, _crumbs.Count - idx - 1);
+                else
+                    _crumbs.Add((folderId, folderName));
+            }
+
+            RebuildBreadcrumb();
+            LoadFolder(folderId);
+        }
+
+        // ── Breadcrumb rendering ──────────────────────────────────────────────
+
+        private void RebuildBreadcrumb()
+        {
+            BreadcrumbPanel.Children.Clear();
+            for (int i = 0; i < _crumbs.Count; i++)
+            {
+                var (id, name) = _crumbs[i];
+                bool isLast = i == _crumbs.Count - 1;
+
+                if (isLast)
+                {
+                    // Current folder: plain bold text
+                    BreadcrumbPanel.Children.Add(new TextBlock
+                    {
+                        Text = name,
+                        FontSize = 12,
+                        FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                        VerticalAlignment = VerticalAlignment.Center,
+                        Margin = new Thickness(0, 0, 2, 0)
+                    });
+                }
+                else
+                {
+                    // Ancestor: hyperlink-style button
+                    var btn = new Button
+                    {
+                        Content = name,
+                        FontSize = 12,
+                        Background = new Microsoft.UI.Xaml.Media.SolidColorBrush(
+                            Microsoft.UI.Colors.Transparent),
+                        BorderThickness = new Thickness(0),
+                        Padding = new Thickness(0),
+                        VerticalAlignment = VerticalAlignment.Center,
+                        Tag = (id, name)
+                    };
+                    btn.Click += BreadcrumbBtn_Click;
+                    BreadcrumbPanel.Children.Add(btn);
+
+                    BreadcrumbPanel.Children.Add(new TextBlock
+                    {
+                        Text = "›",
+                        FontSize = 14,
+                        Opacity = 0.4,
+                        VerticalAlignment = VerticalAlignment.Center,
+                        Margin = new Thickness(2, 0, 2, 0)
+                    });
+                }
+            }
+        }
+
+        private void BreadcrumbBtn_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is Button btn && btn.Tag is ValueTuple<string?, string> t)
+                NavigateTo(t.Item1, t.Item2);
+        }
+
+        // ── Data loading ──────────────────────────────────────────────────────
+
+        private void LoadFolder(string? folderId)
         {
             ItemsList.Items.Clear();
             SetEmptyState(false, "");
+            StatusBar.Text = "";
 
-            if (string.IsNullOrEmpty(path))
-            {
-                PathBox.Text = path;
-                UpBtn.IsEnabled = false;
-                SetEmptyState(true, "Enter a path above or click Browse…");
-                StatusBar.Text = "";
-                return;
-            }
-
-            if (!Directory.Exists(path))
-            {
-                PathBox.Text = path;
-                UpBtn.IsEnabled = false;
-                SetEmptyState(true, $"Path not found: {path}");
-                StatusBar.Text = "";
-                return;
-            }
-
+            // Child folders
+            var folders = new List<FolderRow>();
             try
             {
-                _currentPath = path;
-                PathBox.Text = path;
-                UpBtn.IsEnabled = Directory.GetParent(path) != null;
-
-                int dirs = 0, files = 0;
-
-                foreach (var dir in Directory.GetDirectories(path))
-                {
-                    ItemsList.Items.Add(new FileEntry(Path.GetFileName(dir), dir, isDirectory: true, 0));
-                    dirs++;
-                }
-
-                foreach (var file in Directory.GetFiles(path))
-                {
-                    long size = 0;
-                    try { size = new FileInfo(file).Length; } catch { }
-                    ItemsList.Items.Add(new FileEntry(Path.GetFileName(file), file, isDirectory: false, size));
-                    files++;
-                }
-
-                if (dirs == 0 && files == 0)
-                    SetEmptyState(true, "This folder is empty.");
+                var json = NativeMethods.UserFolderListChildren(folderId);
+                if (!json.StartsWith("error:"))
+                    folders = JsonSerializer.Deserialize<List<FolderRow>>(json)
+                              ?? new List<FolderRow>();
                 else
-                    StatusBar.Text = $"{dirs} folder{(dirs == 1 ? "" : "s")}, {files} file{(files == 1 ? "" : "s")}";
+                    StatusBar.Text = json;
             }
-            catch (UnauthorizedAccessException)
+            catch { /* FFI not loaded on Linux dev box */ }
+
+            // Items at this folder
+            var items = new List<ItemRow>();
+            try
             {
-                SetEmptyState(true, "Access denied — cannot list this folder.");
-                StatusBar.Text = "";
+                var itemFolderId = string.IsNullOrEmpty(folderId) ? "root" : folderId;
+                var json = NativeMethods.UserFolderListItems(itemFolderId);
+                if (!json.StartsWith("error:"))
+                    items = JsonSerializer.Deserialize<List<ItemRow>>(json)
+                            ?? new List<ItemRow>();
             }
-            catch (IOException ex)
-            {
-                SetEmptyState(true, $"I/O error: {ex.Message}");
-                StatusBar.Text = "";
-            }
+            catch { }
+
+            // Build display rows: folders first, then items
+            foreach (var f in folders)
+                ItemsList.Items.Add(new FolderDisplayRow(f));
+
+            foreach (var it in items)
+                ItemsList.Items.Add(new ItemDisplayRow(it));
+
+            if (ItemsList.Items.Count == 0)
+                SetEmptyState(true, "此文件夹为空。\n点击「New folder」创建子文件夹。");
+            else
+                StatusBar.Text = $"{folders.Count} 个文件夹，{items.Count} 个项目";
         }
 
         private void SetEmptyState(bool visible, string message)
         {
             EmptyState.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
             EmptyText.Text = message;
-            if (!visible && ItemsList.Items.Count > 0)
-                StatusBar.Text = ""; // will be set after counting in NavigateTo
         }
 
-        // ── File entry model ──────────────────────────────────────────────────
+        // ── Events ────────────────────────────────────────────────────────────
 
-        /// <summary>One row in the local folder view.</summary>
-        public sealed class FileEntry
+        private void ItemsList_DoubleTapped(object sender, DoubleTappedRoutedEventArgs e)
         {
-            public string Name       { get; }
-            public string FullPath   { get; }
-            public bool   IsDirectory { get; }
-            public long   SizeBytes  { get; }
-            public string IconGlyph  => IsDirectory ? "" : ""; // Folder / File
-            public string Meta       => IsDirectory ? "folder" : FormatSize(SizeBytes);
+            if (ItemsList.SelectedItem is FolderDisplayRow row)
+                NavigateTo(row.FolderId, row.Name);
+        }
 
-            public FileEntry(string name, string fullPath, bool isDirectory, long sizeBytes)
-            {
-                Name = name; FullPath = fullPath; IsDirectory = isDirectory; SizeBytes = sizeBytes;
-            }
+        private void ItemsList_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            // Selection used only to highlight; double-tap enters folder.
+        }
 
-            private static string FormatSize(long bytes) => bytes switch
+        // ── New folder ────────────────────────────────────────────────────────
+
+        private async void NewFolderBtn_Click(object sender, RoutedEventArgs e)
+        {
+            var nameBox = new TextBox
             {
-                < 1024                => $"{bytes} B",
-                < 1024 * 1024         => $"{bytes / 1024.0:F1} KB",
-                < 1024L * 1024 * 1024 => $"{bytes / (1024.0 * 1024):F1} MB",
-                _                     => $"{bytes / (1024.0 * 1024 * 1024):F2} GB"
+                PlaceholderText = "Folder name",
+                MinWidth = 260
             };
+            var dlg = new ContentDialog
+            {
+                Title             = "New folder",
+                Content           = nameBox,
+                PrimaryButtonText = "Create",
+                CloseButtonText   = "Cancel",
+                XamlRoot          = XamlRoot
+            };
+
+            if (await dlg.ShowAsync() != ContentDialogResult.Primary) return;
+
+            var name = nameBox.Text.Trim();
+            if (string.IsNullOrEmpty(name)) return;
+
+            // Current folder id (null = virtual root)
+            string? parentId = _crumbs.Count > 0 ? _crumbs[^1].Id : null;
+            var createJson = parentId == null
+                ? $"{{\"name\":\"{EscapeJson(name)}\",\"sort_order\":0}}"
+                : $"{{\"name\":\"{EscapeJson(name)}\",\"parent_id\":\"{EscapeJson(parentId)}\",\"sort_order\":0}}";
+
+            try
+            {
+                var result = NativeMethods.UserFolderCreate(createJson);
+                if (result.StartsWith("error:"))
+                {
+                    StatusBar.Text = result;
+                    return;
+                }
+                // Reload current folder
+                LoadFolder(parentId);
+            }
+            catch (Exception ex)
+            {
+                StatusBar.Text = $"Create failed: {ex.Message}";
+            }
+        }
+
+        // ── Rename ────────────────────────────────────────────────────────────
+
+        private async void RenameBtn_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not Button btn || btn.Tag is not FolderDisplayRow row) return;
+
+            var nameBox = new TextBox
+            {
+                Text     = row.Name,
+                MinWidth = 260
+            };
+            var dlg = new ContentDialog
+            {
+                Title             = "Rename folder",
+                Content           = nameBox,
+                PrimaryButtonText = "Rename",
+                CloseButtonText   = "Cancel",
+                XamlRoot          = XamlRoot
+            };
+
+            if (await dlg.ShowAsync() != ContentDialogResult.Primary) return;
+
+            var newName = nameBox.Text.Trim();
+            if (string.IsNullOrEmpty(newName) || newName == row.Name) return;
+
+            try
+            {
+                var result = NativeMethods.UserFolderRename(row.FolderId, newName);
+                if (result.StartsWith("error:"))
+                    StatusBar.Text = result;
+                else
+                {
+                    // If renamed folder is in breadcrumb, update display name
+                    for (int i = 0; i < _crumbs.Count; i++)
+                        if (_crumbs[i].Id == row.FolderId)
+                            _crumbs[i] = (row.FolderId, newName);
+                    RebuildBreadcrumb();
+
+                    string? currentId = _crumbs.Count > 0 ? _crumbs[^1].Id : null;
+                    LoadFolder(currentId);
+                }
+            }
+            catch (Exception ex)
+            {
+                StatusBar.Text = $"Rename failed: {ex.Message}";
+            }
+        }
+
+        // ── Delete ────────────────────────────────────────────────────────────
+
+        private async void DeleteBtn_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not Button btn || btn.Tag is not FolderDisplayRow row) return;
+
+            var confirmDlg = new ContentDialog
+            {
+                Title             = "Delete folder",
+                Content           = $"Delete \"{row.Name}\" and all its contents? This cannot be undone.",
+                PrimaryButtonText = "Delete",
+                CloseButtonText   = "Cancel",
+                XamlRoot          = XamlRoot,
+                DefaultButton     = ContentDialogButton.Close
+            };
+
+            if (await confirmDlg.ShowAsync() != ContentDialogResult.Primary) return;
+
+            try
+            {
+                var result = NativeMethods.UserFolderDelete(row.FolderId);
+                if (result.StartsWith("error:"))
+                    StatusBar.Text = result;
+                else
+                {
+                    string? currentId = _crumbs.Count > 0 ? _crumbs[^1].Id : null;
+                    LoadFolder(currentId);
+                }
+            }
+            catch (Exception ex)
+            {
+                StatusBar.Text = $"Delete failed: {ex.Message}";
+            }
+        }
+
+        // ── Helpers ───────────────────────────────────────────────────────────
+
+        private static string EscapeJson(string s)
+            => s.Replace("\\", "\\\\").Replace("\"", "\\\"");
+
+        // ── Data models ───────────────────────────────────────────────────────
+
+        // Raw FFI folder JSON shape
+        private sealed class FolderRow
+        {
+            [JsonPropertyName("id")]         public string Id        { get; set; } = "";
+            [JsonPropertyName("name")]       public string Name      { get; set; } = "";
+            [JsonPropertyName("parent_id")]  public string? ParentId { get; set; }
+            [JsonPropertyName("sort_order")] public int SortOrder    { get; set; }
+        }
+
+        // Raw FFI item JSON shape
+        private sealed class ItemRow
+        {
+            [JsonPropertyName("folder_id")]  public string FolderId  { get; set; } = "";
+            [JsonPropertyName("ref_kind")]   public string RefKind   { get; set; } = "";
+            [JsonPropertyName("ref_key")]    public string RefKey    { get; set; } = "";
+            [JsonPropertyName("sort_order")] public int SortOrder    { get; set; }
+            [JsonPropertyName("added_at")]   public long AddedAt     { get; set; }
+        }
+
+        // Display row for a folder (used in ListView DataTemplate binding)
+        public sealed class FolderDisplayRow
+        {
+            public string  FolderId   { get; }
+            public string  Name       { get; }
+            public bool    IsFolder   => true;
+            public string  IconGlyph  => "";   // Folder (matches sidebar Folders glyph)
+            public string  SubLine    => "文件夹";
+
+            public FolderDisplayRow(FolderRow r)
+            {
+                FolderId = r.Id;
+                Name     = r.Name;
+            }
+        }
+
+        // Display row for a leaf item (used in ListView DataTemplate binding)
+        public sealed class ItemDisplayRow
+        {
+            public string  Name       { get; }
+            public bool    IsFolder   => false;
+            public string  IconGlyph  { get; }
+            public string  SubLine    { get; }
+
+            public ItemDisplayRow(ItemRow r)
+            {
+                Name      = r.RefKey;
+                SubLine   = r.RefKind;
+                IconGlyph = r.RefKind switch
+                {
+                    "track"  => "",  // Music note
+                    "album"  => "",  // Album / disc
+                    "artist" => "",  // Contact / artist
+                    _        => ""   // Generic item / file
+                };
+            }
         }
     }
 }

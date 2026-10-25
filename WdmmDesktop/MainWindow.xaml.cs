@@ -19,6 +19,8 @@ namespace WdmmDesktop
         private List<TextBlock> _navLabels = new();
 
         // Maps sidebar Tag strings → destination Page types.
+        // Note: Cast is intentionally absent — casting is a dialog invoked from
+        // MusicPage (Dialogs/CastDialog), not a sidebar destination (Android parity).
         private static readonly Dictionary<string, Type> _pageMap = new()
         {
             ["Folders"]   = typeof(FoldersPage),
@@ -27,7 +29,6 @@ namespace WdmmDesktop
             ["Manga"]     = typeof(MangaPage),
             ["Network"]   = typeof(NetworkPage),
             ["Tasks"]     = typeof(TasksPage),
-            ["Cast"]      = typeof(CastPage),
             ["About"]     = typeof(AboutPage),
         };
 
@@ -44,8 +45,17 @@ namespace WdmmDesktop
             CollectNavLabels();
             CollectNavButtons();
 
-            // Start on Folders
-            ContentFrame.Navigate(typeof(FoldersPage));
+            // Start on user-preferred home tab (Settings → 主页与导航), default Folders.
+            var prefs = LocalStore.Load("desktop_prefs.json", new Dialogs.SettingsDialog.DesktopPrefs());
+            var home = string.IsNullOrWhiteSpace(prefs.DefaultHome) ? "Folders" : prefs.DefaultHome;
+            if (_pageMap.TryGetValue(home, out var homePage))
+                ContentFrame.Navigate(homePage);
+            else
+                ContentFrame.Navigate(typeof(FoldersPage));
+            if (_navButtons.TryGetValue(home, out var homeBtn))
+                homeBtn.IsChecked = true;
+            else
+                NavFolders.IsChecked = true;
         }
 
         // ── Title bar ─────────────────────────────────────────────────────────
@@ -93,7 +103,7 @@ namespace WdmmDesktop
             _navLabels = new List<TextBlock>
             {
                 LblFolders, LblMusic, LblPlaylists, LblManga,
-                LblNetwork, LblTasks, LblCast, LblAbout,
+                LblNetwork, LblTasks, LblAbout,
                 LblSettings
             };
         }
@@ -108,7 +118,6 @@ namespace WdmmDesktop
                 ["Manga"]     = NavManga,
                 ["Network"]   = NavNetwork,
                 ["Tasks"]     = NavTasks,
-                ["Cast"]      = NavCast,
                 ["About"]     = NavAbout,
             };
         }
@@ -150,8 +159,8 @@ namespace WdmmDesktop
         }
 
         /// <summary>
-        /// Programmatically select a sidebar item — called by pages that cross-navigate
-        /// (e.g. MusicPage Cast button → CastPage).
+        /// Programmatically select a sidebar item — called by pages that cross-navigate.
+        /// Cast uses Dialogs/CastDialog (not a sidebar destination).
         /// </summary>
         public void SelectNavItem(string tag)
         {

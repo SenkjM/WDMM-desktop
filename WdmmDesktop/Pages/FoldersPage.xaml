@@ -9,131 +9,119 @@
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <!-- Source picker: Local / Remote -->
-        <StackPanel Grid.Row="0"
-                    Orientation="Horizontal"
-                    Spacing="8"
-                    Margin="12,10,12,6">
-            <ToggleSwitch x:Name="SourceToggle"
-                          OnContent="Remote (WebDAV)"
-                          OffContent="Local"
-                          Toggled="SourceToggle_Toggled"
-                          MinWidth="0" />
-        </StackPanel>
+        <!-- Title row -->
+        <Grid Grid.Row="0" Margin="16,14,16,4">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <TextBlock Grid.Column="0"
+                       Text="我的文件夹"
+                       FontSize="15"
+                       FontWeight="SemiBold"
+                       VerticalAlignment="Center" />
+            <Button x:Name="NewFolderBtn"
+                    Grid.Column="1"
+                    Click="NewFolderBtn_Click"
+                    ToolTipService.ToolTip="New folder"
+                    Padding="10,7">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <FontIcon Glyph="&#xE710;" FontSize="13" />
+                    <TextBlock Text="New folder" FontSize="12" />
+                </StackPanel>
+            </Button>
+        </Grid>
 
-        <!-- Outer row-1 container holds either the blocked bar OR the local grid.
-             Grid is needed so both children can share Grid.Row="1" — only one
-             is ever Visible at a time. -->
-        <Grid Grid.Row="1">
+        <!-- Breadcrumb bar -->
+        <ScrollViewer Grid.Row="1"
+                      HorizontalScrollBarVisibility="Auto"
+                      VerticalScrollBarVisibility="Disabled"
+                      Margin="14,0,14,4">
+            <StackPanel x:Name="BreadcrumbPanel"
+                        Orientation="Horizontal"
+                        Spacing="4" />
+        </ScrollViewer>
 
-            <!-- Remote WebDAV blocked bar (visible in Remote mode; hidden in Local mode) -->
-            <InfoBar x:Name="RemoteBlockedBar"
-                     IsOpen="False"
-                     IsClosable="False"
-                     Severity="Error"
-                     Title="Remote browse unavailable"
-                     Message="Blocked: wdmm_webdav_list not exported in wdmm-core @ d8b2217. Use Network → Sync, then browse local library paths."
-                     VerticalAlignment="Top"
-                     Margin="12,6,12,0"
-                     Visibility="Collapsed" />
+        <!-- Main list + empty state -->
+        <Grid Grid.Row="2">
+            <ListView x:Name="ItemsList"
+                      Margin="12,0,12,0"
+                      SelectionMode="Single"
+                      SelectionChanged="ItemsList_SelectionChanged"
+                      DoubleTapped="ItemsList_DoubleTapped">
+                <ListView.ItemTemplate>
+                    <DataTemplate>
+                        <Grid Padding="4,7" ColumnSpacing="10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <FontIcon Grid.Column="0"
+                                      Glyph="{Binding IconGlyph}"
+                                      FontSize="16"
+                                      Opacity="0.7" />
+                            <StackPanel Grid.Column="1" Spacing="1" VerticalAlignment="Center">
+                                <TextBlock Text="{Binding Name}"
+                                           FontSize="13"
+                                           TextTrimming="CharacterEllipsis" />
+                                <TextBlock Text="{Binding SubLine}"
+                                           FontSize="11"
+                                           Opacity="0.45"
+                                           TextTrimming="CharacterEllipsis" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="2"
+                                        Orientation="Horizontal"
+                                        Spacing="4"
+                                        VerticalAlignment="Center">
+                                <Button Click="RenameBtn_Click"
+                                        Tag="{Binding}"
+                                        Background="Transparent"
+                                        BorderThickness="0"
+                                        Visibility="{Binding IsFolder, Converter={StaticResource BoolToVisibilityConverter}}"
+                                        ToolTipService.ToolTip="Rename"
+                                        Padding="7,5">
+                                    <FontIcon Glyph="&#xE70F;" FontSize="13" />
+                                </Button>
+                                <Button Click="DeleteBtn_Click"
+                                        Tag="{Binding}"
+                                        Background="Transparent"
+                                        BorderThickness="0"
+                                        Visibility="{Binding IsFolder, Converter={StaticResource BoolToVisibilityConverter}}"
+                                        ToolTipService.ToolTip="Delete folder"
+                                        Padding="7,5">
+                                    <FontIcon Glyph="&#xE74D;" FontSize="13" />
+                                </Button>
+                            </StackPanel>
+                        </Grid>
+                    </DataTemplate>
+                </ListView.ItemTemplate>
+            </ListView>
 
-            <!-- Local browser (hidden in Remote mode) -->
-            <Grid x:Name="LocalGrid">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="*" />
-                </Grid.RowDefinitions>
-
-                <!-- Path bar -->
-                <Grid Grid.Row="0" Margin="12,6,12,6">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-
-                    <Button x:Name="UpBtn"
-                            Grid.Column="0"
-                            Click="UpBtn_Click"
-                            IsEnabled="False"
-                            ToolTipService.ToolTip="Go to parent folder"
-                            Margin="0,0,6,0"
-                            Padding="10,8">
-                        <FontIcon Glyph="&#xE74A;" FontSize="14" />
-                    </Button>
-
-                    <TextBox x:Name="PathBox"
-                             Grid.Column="1"
-                             PlaceholderText="Enter a path or click Browse…"
-                             VerticalAlignment="Center"
-                             KeyDown="PathBox_KeyDown" />
-
-                    <Button x:Name="BrowseBtn"
-                            Grid.Column="2"
-                            Content="Browse…"
-                            Click="BrowseBtn_Click"
-                            Margin="6,0,0,0"
-                            Padding="12,8" />
-                </Grid>
-
-                <!-- File/folder list + empty state layer -->
-                <Grid Grid.Row="1">
-                    <ListView x:Name="ItemsList"
-                              Margin="12,0,12,0"
-                              SelectionMode="Single"
-                              DoubleTapped="ItemsList_DoubleTapped">
-                        <ListView.ItemTemplate>
-                            <DataTemplate>
-                                <Grid Padding="4,6" ColumnSpacing="10">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="Auto" />
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <FontIcon Grid.Column="0"
-                                              Glyph="{Binding IconGlyph}"
-                                              FontSize="16"
-                                              Opacity="0.7" />
-                                    <TextBlock Grid.Column="1"
-                                               Text="{Binding Name}"
-                                               VerticalAlignment="Center"
-                                               TextTrimming="CharacterEllipsis" />
-                                    <TextBlock Grid.Column="2"
-                                               Text="{Binding Meta}"
-                                               FontSize="11"
-                                               Opacity="0.5"
-                                               VerticalAlignment="Center" />
-                                </Grid>
-                            </DataTemplate>
-                        </ListView.ItemTemplate>
-                    </ListView>
-
-                    <!-- Empty folder / access-denied / path-not-found state -->
-                    <StackPanel x:Name="EmptyState"
-                                VerticalAlignment="Center"
-                                HorizontalAlignment="Center"
-                                Spacing="8"
-                                Visibility="Collapsed">
-                        <FontIcon Glyph="&#xE7B7;" FontSize="40" Opacity="0.3" />
-                        <TextBlock x:Name="EmptyText"
-                                   FontSize="13"
-                                   Opacity="0.5"
-                                   HorizontalAlignment="Center"
-                                   TextWrapping="Wrap"
-                                   MaxWidth="320"
-                                   TextAlignment="Center" />
-                    </StackPanel>
-                </Grid>
-            </Grid>
+            <StackPanel x:Name="EmptyState"
+                        VerticalAlignment="Center"
+                        HorizontalAlignment="Center"
+                        Spacing="8"
+                        Visibility="Collapsed">
+                <FontIcon Glyph="&#xE8B7;" FontSize="40" Opacity="0.3" />
+                <TextBlock x:Name="EmptyText"
+                           FontSize="13"
+                           Opacity="0.5"
+                           HorizontalAlignment="Center"
+                           TextWrapping="Wrap"
+                           MaxWidth="300"
+                           TextAlignment="Center" />
+            </StackPanel>
         </Grid>
 
         <!-- Status bar -->
         <TextBlock x:Name="StatusBar"
-                   Grid.Row="2"
+                   Grid.Row="3"
                    Margin="14,4,14,10"
                    FontSize="11"
                    Opacity="0.45" />

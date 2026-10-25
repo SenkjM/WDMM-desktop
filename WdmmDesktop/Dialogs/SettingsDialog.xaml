@@ -4,84 +4,292 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:local="using:WdmmDesktop.Dialogs"
-    Title="Settings"
-    PrimaryButtonText="Save"
-    CloseButtonText="Cancel"
-    DefaultButton="Primary">
+    Title="设置"
+    CloseButtonText="关闭"
+    DefaultButton="Close">
 
     <ContentDialog.Resources>
-        <!-- Acrylic tint for the dialog content panel -->
         <AcrylicBrush x:Key="DialogAcrylicBrush"
                       TintColor="{ThemeResource SolidBackgroundFillColorBase}"
                       TintOpacity="0.65"
                       FallbackColor="{ThemeResource SolidBackgroundFillColorBase}" />
+        <Style x:Key="SectionHeaderStyle" TargetType="TextBlock">
+            <Setter Property="FontSize"   Value="13" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Margin"     Value="0,0,0,6" />
+        </Style>
+        <Style x:Key="HintTextStyle" TargetType="TextBlock">
+            <Setter Property="FontSize"  Value="11" />
+            <Setter Property="Opacity"   Value="0.55" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+        </Style>
+        <Style x:Key="StubRowStyle" TargetType="StackPanel">
+            <Setter Property="Spacing" Value="4" />
+        </Style>
     </ContentDialog.Resources>
 
     <Border Background="{StaticResource DialogAcrylicBrush}"
             CornerRadius="8"
-            Padding="4">
-        <StackPanel Spacing="16" Width="360">
+            Padding="0">
+        <Grid Width="680" Height="480">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="168" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
 
-            <!-- FFI status row -->
-            <Border Background="{ThemeResource LayerFillColorDefaultBrush}"
-                    CornerRadius="6"
-                    Padding="12,10">
-                <StackPanel Orientation="Horizontal" Spacing="8">
-                    <FontIcon Glyph="&#xE9F5;" FontSize="14" />
+            <!-- Left nav list -->
+            <Border Grid.Column="0"
+                    BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+                    BorderThickness="0,0,1,0">
+                <StackPanel Margin="6,8,6,8" Spacing="2">
+                    <!-- FFI version strip at top -->
                     <TextBlock x:Name="FfiVersionText"
-                               FontSize="12"
-                               VerticalAlignment="Center"
-                               TextTrimming="CharacterEllipsis" />
+                               FontSize="11"
+                               Opacity="0.5"
+                               TextTrimming="CharacterEllipsis"
+                               Margin="8,2,8,10" />
+
+                    <RadioButton x:Name="NavHome"      GroupName="SettingsNav" Tag="Home"     IsChecked="True" Checked="SettingsNav_Checked" HorizontalAlignment="Stretch" Content="主页与导航" />
+                    <RadioButton x:Name="NavLibrary"   GroupName="SettingsNav" Tag="Library"               Checked="SettingsNav_Checked" HorizontalAlignment="Stretch" Content="媒体库" />
+                    <RadioButton x:Name="NavNetwork2"  GroupName="SettingsNav" Tag="Network2"               Checked="SettingsNav_Checked" HorizontalAlignment="Stretch" Content="网络库" />
+                    <RadioButton x:Name="NavVideoFile" GroupName="SettingsNav" Tag="VideoFile"              Checked="SettingsNav_Checked" HorizontalAlignment="Stretch" Content="视频/图片/文件" />
+                    <RadioButton x:Name="NavMisc"      GroupName="SettingsNav" Tag="Misc"                  Checked="SettingsNav_Checked" HorizontalAlignment="Stretch" Content="杂项" />
+                    <RadioButton x:Name="NavSync"      GroupName="SettingsNav" Tag="Sync"                  Checked="SettingsNav_Checked" HorizontalAlignment="Stretch" Content="同步与备份" />
+                    <RadioButton x:Name="NavOpenApi"   GroupName="SettingsNav" Tag="OpenApi"               Checked="SettingsNav_Checked" HorizontalAlignment="Stretch" Content="第三方/开发者" />
                 </StackPanel>
             </Border>
 
-            <!-- Bind Mode -->
-            <StackPanel Spacing="6">
-                <TextBlock Text="Bind Mode" FontWeight="SemiBold" FontSize="13" />
-                <ComboBox x:Name="BindModeCombo"
-                          SelectedIndex="0"
-                          HorizontalAlignment="Stretch">
-                    <ComboBoxItem Content="Local (127.0.0.1)" />
-                    <ComboBoxItem Content="Global (0.0.0.0)" />
-                    <ComboBoxItem Content="Custom" />
-                </ComboBox>
-            </StackPanel>
+            <!-- Right content area -->
+            <ScrollViewer Grid.Column="1"
+                          VerticalScrollBarVisibility="Auto"
+                          HorizontalScrollBarVisibility="Disabled"
+                          Padding="20,16,20,16">
+                <Grid>
 
-            <!-- Port -->
-            <StackPanel Spacing="6">
-                <TextBlock Text="Port" FontWeight="SemiBold" FontSize="13" />
-                <TextBox x:Name="PortBox"
-                         Text="8080"
-                         PlaceholderText="1024-65535"
-                         InputScope="Number"
-                         MaxLength="5" />
-            </StackPanel>
+                    <!-- ── Section 1: 主页与导航 ── -->
+                    <StackPanel x:Name="PanelHome" Spacing="16" Visibility="Visible">
+                        <TextBlock Style="{StaticResource SectionHeaderStyle}" Text="主页与导航" />
 
-            <!-- Token (read-only) + rotate -->
-            <StackPanel Spacing="6">
-                <TextBlock Text="API Token" FontWeight="SemiBold" FontSize="13" />
-                <TextBox x:Name="TokenBox"
-                         Text=""
-                         IsReadOnly="True"
-                         FontFamily="Cascadia Mono,Consolas,monospace"
-                         FontSize="12" />
-                <Button x:Name="RotateTokenBtn"
-                        Content="Rotate Token"
-                        Click="RotateTokenBtn_Click"
-                        HorizontalAlignment="Left"
-                        Padding="12,6" />
-                <TextBlock Text="Native FFI clients on the same machine skip this token. External HTTP clients must include it in the Authorization header."
-                           FontSize="11"
-                           Opacity="0.6"
-                           TextWrapping="Wrap" />
-            </StackPanel>
+                        <StackPanel Spacing="6">
+                            <TextBlock Text="默认首页" FontSize="12" />
+                            <ComboBox x:Name="DefaultHomeCombo"
+                                      HorizontalAlignment="Stretch">
+                                <ComboBoxItem Content="Folders (我的文件夹)" Tag="Folders" IsSelected="True" />
+                                <ComboBoxItem Content="Music"               Tag="Music" />
+                                <ComboBoxItem Content="Playlists"           Tag="Playlists" />
+                                <ComboBoxItem Content="Manga"               Tag="Manga" />
+                                <ComboBoxItem Content="Network"             Tag="Network" />
+                                <ComboBoxItem Content="Tasks"               Tag="Tasks" />
+                            </ComboBox>
+                            <TextBlock Style="{StaticResource HintTextStyle}"
+                                       Text="应用启动时进入的页面。" />
+                        </StackPanel>
 
-            <!-- Save status / error feedback -->
-            <TextBlock x:Name="SaveStatusText"
-                       FontSize="12"
-                       TextWrapping="Wrap"
-                       Visibility="Collapsed" />
+                        <StackPanel Spacing="6">
+                            <ToggleSwitch x:Name="RememberNetworkPathToggle"
+                                          Header="记住网络路径"
+                                          MinWidth="0" />
+                            <TextBlock Style="{StaticResource HintTextStyle}"
+                                       Text="切换至网络页时自动恢复上次浏览的路径（本地偏好）。" />
+                        </StackPanel>
 
-        </StackPanel>
+                        <Button x:Name="SaveHomeBtn"
+                                Click="SaveHomeBtn_Click"
+                                Content="保存"
+                                Style="{StaticResource AccentButtonStyle}"
+                                Padding="16,8" />
+                        <TextBlock x:Name="HomeStatusText" FontSize="11" Visibility="Collapsed" />
+                    </StackPanel>
+
+                    <!-- ── Section 2: 媒体库 ── -->
+                    <StackPanel x:Name="PanelLibrary" Spacing="16" Visibility="Collapsed">
+                        <TextBlock Style="{StaticResource SectionHeaderStyle}" Text="媒体库" />
+                        <InfoBar IsOpen="True" IsClosable="False" Severity="Informational"
+                                 Title="待 FFI"
+                                 Message="媒体库设置需要 wdmm_library_settings_* FFI（Core 重构后提供）。当前媒体库读写通过 wdmm_track_list / wdmm_library_init 完成。" />
+                        <StackPanel Spacing="6">
+                            <TextBlock Text="媒体库路径" FontSize="12" />
+                            <TextBox IsEnabled="False" PlaceholderText="（待 FFI 提供设置接口）" />
+                        </StackPanel>
+                        <StackPanel Spacing="6">
+                            <TextBlock Text="漫画库路径" FontSize="12" />
+                            <TextBox IsEnabled="False" PlaceholderText="（待 FFI 提供漫画 API）" />
+                        </StackPanel>
+                    </StackPanel>
+
+                    <!-- ── Section 3: 网络库 ── -->
+                    <StackPanel x:Name="PanelNetwork2" Spacing="16" Visibility="Collapsed">
+                        <TextBlock Style="{StaticResource SectionHeaderStyle}" Text="网络库" />
+
+                        <StackPanel Spacing="6">
+                            <TextBlock Text="账号" FontSize="12" FontWeight="SemiBold" />
+                            <TextBlock Style="{StaticResource HintTextStyle}"
+                                       Text="WebDAV 账号列表显示在「Network」页。在此处仅展示数量；增删请转到 Network 页。" />
+                            <TextBlock x:Name="AccountCountText" FontSize="12" Opacity="0.7" />
+                        </StackPanel>
+
+                        <StackPanel Spacing="6">
+                            <TextBlock Text="下载队列设置" FontSize="12" FontWeight="SemiBold" />
+                            <TextBox IsEnabled="False" PlaceholderText="最大并发数（待 FFI）" />
+                            <TextBlock Style="{StaticResource HintTextStyle}"
+                                       Text="待 FFI：wdmm_queue_set_concurrency 未导出。" />
+                        </StackPanel>
+
+                        <StackPanel Spacing="6">
+                            <TextBlock Text="传输加密" FontSize="12" FontWeight="SemiBold" />
+                            <ToggleSwitch IsEnabled="False"
+                                          Header="启用 AES-256-GCM 加密（待 FFI）"
+                                          MinWidth="0" />
+                            <TextBlock Style="{StaticResource HintTextStyle}"
+                                       Text="待 FFI：加密密钥管理 API 未导出。" />
+                        </StackPanel>
+                    </StackPanel>
+
+                    <!-- ── Section 4: 视频/图片/文件类型 ── -->
+                    <StackPanel x:Name="PanelVideoFile" Spacing="16" Visibility="Collapsed">
+                        <TextBlock Style="{StaticResource SectionHeaderStyle}" Text="视频 / 图片 / 文件类型" />
+                        <InfoBar IsOpen="True" IsClosable="False" Severity="Informational"
+                                 Title="待 FFI"
+                                 Message="视频/图片类型偏好及文件扩展名过滤需要 wdmm_prefs_* FFI（Core 重构后提供）。" />
+                        <StackPanel Spacing="6">
+                            <TextBlock Text="视频文件扩展名" FontSize="12" />
+                            <TextBox IsEnabled="False" PlaceholderText="mp4, mkv, avi, …（待 FFI）" />
+                        </StackPanel>
+                        <StackPanel Spacing="6">
+                            <TextBlock Text="图片文件扩展名" FontSize="12" />
+                            <TextBox IsEnabled="False" PlaceholderText="jpg, png, webp, …（待 FFI）" />
+                        </StackPanel>
+                    </StackPanel>
+
+                    <!-- ── Section 5: 杂项 ── -->
+                    <StackPanel x:Name="PanelMisc" Spacing="16" Visibility="Collapsed">
+                        <TextBlock Style="{StaticResource SectionHeaderStyle}" Text="杂项" />
+
+                        <StackPanel Spacing="6">
+                            <TextBlock Text="主题" FontSize="12" FontWeight="SemiBold" />
+                            <ComboBox x:Name="ThemeCombo"
+                                      HorizontalAlignment="Stretch">
+                                <ComboBoxItem Content="跟随系统" Tag="Default"  IsSelected="True" />
+                                <ComboBoxItem Content="浅色"     Tag="Light" />
+                                <ComboBoxItem Content="深色"     Tag="Dark" />
+                            </ComboBox>
+                            <TextBlock Style="{StaticResource HintTextStyle}"
+                                       Text="更改主题立即生效（WinUI ElementTheme）。" />
+                        </StackPanel>
+
+                        <StackPanel Spacing="6">
+                            <TextBlock Text="界面语言" FontSize="12" FontWeight="SemiBold" />
+                            <ComboBox IsEnabled="False" HorizontalAlignment="Stretch">
+                                <ComboBoxItem Content="跟随系统（待 FFI）" IsSelected="True" />
+                            </ComboBox>
+                        </StackPanel>
+
+                        <StackPanel Spacing="6">
+                            <TextBlock Text="提示持续时间（秒）" FontSize="12" FontWeight="SemiBold" />
+                            <NumberBox IsEnabled="False"
+                                       Minimum="1" Maximum="30" Value="3"
+                                       SpinButtonPlacementMode="Compact" />
+                            <TextBlock Style="{StaticResource HintTextStyle}"
+                                       Text="待 FFI：全局提示时长设置 API 未导出。" />
+                        </StackPanel>
+
+                        <Button x:Name="SaveMiscBtn"
+                                Click="SaveMiscBtn_Click"
+                                Content="应用主题"
+                                Style="{StaticResource AccentButtonStyle}"
+                                Padding="16,8" />
+                        <TextBlock x:Name="MiscStatusText" FontSize="11" Visibility="Collapsed" />
+                    </StackPanel>
+
+                    <!-- ── Section 6: 同步与备份 ── -->
+                    <StackPanel x:Name="PanelSync" Spacing="16" Visibility="Collapsed">
+                        <TextBlock Style="{StaticResource SectionHeaderStyle}" Text="同步与备份" />
+
+                        <StackPanel Spacing="6">
+                            <TextBlock Text="同步远端路径" FontSize="12" FontWeight="SemiBold" />
+                            <TextBox x:Name="SyncRemoteDirBox"
+                                     PlaceholderText="WebDAV 远端目录（如 /wdmm-sync）" />
+                            <TextBlock Style="{StaticResource HintTextStyle}"
+                                       Text="账号凭据在 Network 页管理。此处仅填写目标目录。" />
+                        </StackPanel>
+
+                        <StackPanel Spacing="6">
+                            <TextBlock Text="凭据" FontSize="12" FontWeight="SemiBold" />
+                            <TextBox x:Name="SyncUrlBox"
+                                     PlaceholderText="WebDAV URL（如 https://nas.local/dav）" />
+                            <TextBox x:Name="SyncUserBox"
+                                     PlaceholderText="用户名" />
+                            <PasswordBox x:Name="SyncPassBox"
+                                         PlaceholderText="密码" />
+                            <TextBlock Style="{StaticResource HintTextStyle}"
+                                       Text="密码仅保存在本机 LocalStore；不上传到任何云服务。" />
+                        </StackPanel>
+
+                        <Button x:Name="TriggerSyncBtn"
+                                Click="TriggerSyncBtn_Click"
+                                Content="立即同步"
+                                Padding="16,8" />
+                        <TextBlock x:Name="SyncStatusText" FontSize="11" TextWrapping="Wrap" Visibility="Collapsed" />
+                    </StackPanel>
+
+                    <!-- ── Section 7: 第三方/开发者 (OpenAPI) ── -->
+                    <StackPanel x:Name="PanelOpenApi" Spacing="16" Visibility="Collapsed">
+                        <TextBlock Style="{StaticResource SectionHeaderStyle}" Text="第三方 / 开发者 (OpenAPI)" />
+                        <TextBlock Style="{StaticResource HintTextStyle}"
+                                   Text="OpenAPI 服务器仅供第三方 HTTP 客户端使用（如脚本、外部工具）。桌面应用内部业务路径使用 FFI，不依赖此服务器。" />
+
+                        <StackPanel Spacing="6">
+                            <TextBlock Text="绑定模式" FontSize="12" FontWeight="SemiBold" />
+                            <ComboBox x:Name="BindModeCombo"
+                                      HorizontalAlignment="Stretch"
+                                      SelectedIndex="0">
+                                <ComboBoxItem Content="Local (127.0.0.1)" />
+                                <ComboBoxItem Content="Global (0.0.0.0)" />
+                                <ComboBoxItem Content="Custom" />
+                            </ComboBox>
+                        </StackPanel>
+
+                        <StackPanel Spacing="6">
+                            <TextBlock Text="端口" FontSize="12" FontWeight="SemiBold" />
+                            <TextBox x:Name="PortBox"
+                                     Text="8080"
+                                     PlaceholderText="1024-65535"
+                                     InputScope="Number"
+                                     MaxLength="5" />
+                        </StackPanel>
+
+                        <StackPanel Spacing="6">
+                            <TextBlock Text="API Token（只读）" FontSize="12" FontWeight="SemiBold" />
+                            <TextBox x:Name="TokenBox"
+                                     IsReadOnly="True"
+                                     FontFamily="Cascadia Mono,Consolas,monospace"
+                                     FontSize="11" />
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <Button x:Name="StartApiBtn"
+                                        Content="启动服务器"
+                                        Click="StartApiBtn_Click"
+                                        Padding="12,6" />
+                                <Button x:Name="StopApiBtn"
+                                        Content="停止服务器"
+                                        Click="StopApiBtn_Click"
+                                        Padding="12,6" />
+                                <Button x:Name="RotateTokenBtn"
+                                        Content="轮换 Token"
+                                        Click="RotateTokenBtn_Click"
+                                        Padding="12,6" />
+                            </StackPanel>
+                            <TextBlock Style="{StaticResource HintTextStyle}"
+                                       Text="本机 FFI 客户端不需要 Token；外部 HTTP 客户端须在 Authorization 头携带它。" />
+                        </StackPanel>
+
+                        <TextBlock x:Name="SaveStatusText"
+                                   FontSize="12"
+                                   TextWrapping="Wrap"
+                                   Visibility="Collapsed" />
+                    </StackPanel>
+
+                </Grid>
+            </ScrollViewer>
+        </Grid>
     </Border>
 </ContentDialog>

@@ -1,120 +1,293 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text.Json;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using WdmmDesktop.Generated;
 
 namespace WdmmDesktop.Dialogs
 {
+    /// <summary>
+    /// Settings dialog — Android settings_screen.dart section parity.
+    /// Sections: 主页与导航 / 媒体库 / 网络库 / 视频·图片·文件 / 杂项 /
+    /// 同步与备份 / 第三方·开发者(OpenAPI).
+    ///
+    /// Hard rule: disabled「待 FFI」controls never pretend a save succeeded.
+    /// Real local prefs persist via LocalStore JSON. OpenAPI controls are the
+    /// ONLY place Bind/Port/Token belong (third-party API, not core app settings).
+    /// </summary>
     public sealed partial class SettingsDialog : ContentDialog
     {
+        private readonly string _ffiVersion;
+
+        // Local prefs file (managed by LocalStore).
+        private const string PrefsFile = "desktop_prefs.json";
+
         public SettingsDialog(string ffiVersion)
         {
             InitializeComponent();
+            _ffiVersion = ffiVersion;
             FfiVersionText.Text = $"wdmm-core {ffiVersion}";
+
+            LoadLocalPrefs();
             LoadFfiState();
-            PrimaryButtonClick += SettingsDialog_PrimaryButtonClick;
+            LoadAccounts();
         }
 
-        // Populate port and token from FFI if available.
-        // wdmm_ffi.dll is absent on Linux dev machines — tolerate load failure.
+        // ── Section switching ──────────────────────────────────────────────────
+
+        private void SettingsNav_Checked(object sender, RoutedEventArgs e)
+        {
+            if (sender is not RadioButton rb || rb.Tag is not string tag) return;
+            ShowPanel(tag);
+        }
+
+        private void ShowPanel(string tag)
+        {
+            PanelHome.Visibility     = tag == "Home"     ? Visibility.Visible : Visibility.Collapsed;
+            PanelLibrary.Visibility  = tag == "Library" ? Visibility.Visible : Visibility.Collapsed;
+            PanelNetwork2.Visibility = tag == "Network2" ? Visibility.Visible : Visibility.Collapsed;
+            PanelVideoFile.Visibility= tag == "VideoFile"? Visibility.Visible : Visibility.Collapsed;
+            PanelMisc.Visibility     = tag == "Misc"    ? Visibility.Visible : Visibility.Collapsed;
+            PanelSync.Visibility     = tag == "Sync"     ? Visibility.Visible : Visibility.Collapsed;
+            PanelOpenApi.Visibility  = tag == "OpenApi"  ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        // ── Local prefs persistence ───────────────────────────────────────────
+
+        // Public so System.Text.Json's default resolver can build a contract for it.
+        public sealed class DesktopPrefs
+        {
+            public string DefaultHome { get; set; } = "Folders";
+            public bool   RememberNetworkPath { get; set; } = true;
+            public string Theme { get; set; } = "Default";
+            public string? SyncRemoteDir { get; set; }
+            public string? SyncUrl { get; set; }
+            public string? SyncUser { get; set; }
+            public string? SyncPass { get; set; }
+            // Bind mode / port are OpenAPI (third-party) prefs, kept here too.
+            public int    OpenApiPort { get; set; } = 8080;
+            public int    BindMode { get; set; } = 0;
+        }
+
+        private DesktopPrefs _prefs = new();
+
+        private void LoadLocalPrefs()
+        {
+            _prefs = LocalStore.Load(PrefsFile, new DesktopPrefs());
+
+            // Default home combo
+            SelectComboByTag(DefaultHomeCombo, _prefs.DefaultHome);
+
+            // Remember network path
+            RememberNetworkPathToggle.IsOn = _prefs.RememberNetworkPath;
+
+            // Theme
+            SelectComboByTag(ThemeCombo, _prefs.Theme);
+
+            // Sync fields
+            SyncRemoteDirBox.Text = _prefs.SyncRemoteDir ?? "";
+            SyncUrlBox.Text        = _prefs.SyncUrl ?? "";
+            SyncUserBox.Text       = _prefs.SyncUser ?? "";
+
+            // OpenAPI port / bind mode
+            PortBox.Text      = _prefs.OpenApiPort.ToString();
+            BindModeCombo.SelectedIndex = _prefs.BindMode;
+        }
+
+        private static void SelectComboByTag(ComboBox combo, string tag)
+        {
+            foreach (var item in combo.Items.OfType<ComboBoxItem>())
+            {
+                if ((item.Tag as string) == tag) { item.IsSelected = true; return; }
+            }
+        }
+
+        private static string SelectedComboTag(ComboBox combo)
+        {
+            if (combo.SelectedItem is ComboBoxItem ci) return ci.Tag as string ?? "";
+            return "";
+        }
+
+        // ── Section 1: 主页与导航 ───────────────────────────────────────────────
+
+        private void SaveHomeBtn_Click(object sender, RoutedEventArgs e)
+        {
+            _prefs.DefaultHome        = SelectedComboTag(DefaultHomeCombo);
+            _prefs.RememberNetworkPath = RememberNetworkPathToggle.IsOn;
+            LocalStore.Save(PrefsFile, _prefs);
+            ShowInlineStatus(HomeStatusText, "已保存。", isError: false);
+        }
+
+        // ── Section 5: 杂项 (主题) ───────────────────────────────────────────────
+
+        private void SaveMiscBtn_Click(object sender, RoutedEventArgs e)
+        {
+            _prefs.Theme = SelectedComboTag(ThemeCombo);
+            LocalStore.Save(PrefsFile, _prefs);
+
+            // Apply theme immediately to the main window content root.
+            ApplyTheme(_prefs.Theme);
+            ShowInlineStatus(MiscStatusText, "主题已应用。", isError: false);
+        }
+
+        private static void ApplyTheme(string theme)
+        {
+            if (App.MainWindow?.Content is FrameworkElement root)
+            {
+                root.RequestedTheme = theme switch
+                {
+                    "Light"  => ElementTheme.Light,
+                    "Dark"   => ElementTheme.Dark,
+                    _        => ElementTheme.Default
+                };
+            }
+        }
+
+        // ── Section 6: 同步与备份 ─────────────────────────────────────────────────
+
+        private void TriggerSyncBtn_Click(object sender, RoutedEventArgs e)
+        {
+            var url  = SyncUrlBox.Text.Trim();
+            var user = SyncUserBox.Text.Trim();
+            var pass = SyncPassBox.Password;
+            var dir  = SyncRemoteDirBox.Text.Trim();
+
+            if (string.IsNullOrEmpty(url) || string.IsNullOrEmpty(dir))
+            {
+                ShowSyncStatus("填写 WebDAV URL 和远端目录后再同步。", isError: true);
+                return;
+            }
+
+            // Persist before triggering (best-effort).
+            _prefs.SyncRemoteDir = dir;
+            _prefs.SyncUrl        = url;
+            _prefs.SyncUser       = user;
+            _prefs.SyncPass       = pass;
+            LocalStore.Save(PrefsFile, _prefs);
+
+            ShowSyncStatus("正在触发同步…", isError: false);
+            try
+            {
+                var result = NativeMethods.WithNativeSyncTrigger(url, user, pass, dir);
+                ShowSyncStatus(result.StartsWith("error:") ? result : "同步完成。", isError: result.StartsWith("error:"));
+            }
+            catch (Exception ex)
+            {
+                ShowSyncStatus($"同步失败：{ex.Message}", isError: true);
+            }
+        }
+
+        private void ShowSyncStatus(string msg, bool isError)
+        {
+            SyncStatusText.Text = msg;
+            SyncStatusText.Foreground = isError
+                ? (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["SystemFillColorCriticalBrush"]
+                : (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["TextFillColorPrimaryBrush"];
+            SyncStatusText.Visibility = Visibility.Visible;
+        }
+
+        // ── Section 7: OpenAPI (第三方/开发者) ───────────────────────────────────
+
         private void LoadFfiState()
         {
             try
             {
                 var port = NativeMethods.OpenApiPort();
-                if (port > 0)
-                    PortBox.Text = port.ToString();
-
+                if (port > 0) PortBox.Text = port.ToString();
                 var token = NativeMethods.TokenGet();
-                if (!string.IsNullOrEmpty(token))
-                    TokenBox.Text = token;
+                if (!string.IsNullOrEmpty(token)) TokenBox.Text = token;
             }
-            catch
-            {
-                // FFI not loaded — leave defaults, Save will no-op.
-            }
+            catch { /* FFI not loaded */ }
         }
 
-        // Save: (re-)start the OpenAPI server on the requested port,
-        // then refresh the displayed port + token from the live FFI.
-        private void SettingsDialog_PrimaryButtonClick(
-            ContentDialog sender,
-            ContentDialogButtonClickEventArgs args)
+        private void LoadAccounts()
         {
-            var deferral = args.GetDeferral();
             try
             {
-                if (!ushort.TryParse(PortBox.Text.Trim(), out var port) || port < 1024)
-                {
-                    ShowStatus("Port must be 1024–65535.", isError: true);
-                    args.Cancel = true;
-                    return;
-                }
-
-                try
-                {
-                    var result = NativeMethods.StartOpenApi(port);
-                    if (result.StartsWith("error:"))
-                    {
-                        ShowStatus(result, isError: true);
-                        args.Cancel = true;
-                        return;
-                    }
-
-                    ShowStatus("", isError: false);
-
-                    // result is the bearer token on success; re-read to confirm.
-                    var token = NativeMethods.TokenGet();
-                    TokenBox.Text = string.IsNullOrEmpty(token) ? result : token;
-
-                    var boundPort = NativeMethods.OpenApiPort();
-                    if (boundPort > 0)
-                        PortBox.Text = boundPort.ToString();
-                }
-                catch
-                {
-                    // FFI not loaded (Linux dev) — treat Save as a no-op and close.
-                }
+                var accounts = LocalStore.LoadAccounts();
+                AccountCountText.Text = accounts.Count == 0
+                    ? "尚未添加账号。"
+                    : $"已配置 {accounts.Count} 个账号。";
             }
-            finally
+            catch { AccountCountText.Text = "账号信息不可用。"; }
+        }
+
+        private void StartApiBtn_Click(object sender, RoutedEventArgs e)
+        {
+            if (!ushort.TryParse(PortBox.Text.Trim(), out var port) || port < 1024)
             {
-                deferral.Complete();
+                ShowApiStatus("端口须为 1024–65535。", isError: true);
+                return;
+            }
+            try
+            {
+                var result = NativeMethods.StartOpenApi(port);
+                if (result.StartsWith("error:")) { ShowApiStatus(result, isError: true); return; }
+                _prefs.OpenApiPort = port;
+                _prefs.BindMode    = BindModeCombo.SelectedIndex;
+                LocalStore.Save(PrefsFile, _prefs);
+
+                var token = NativeMethods.TokenGet();
+                TokenBox.Text = string.IsNullOrEmpty(token) ? result : token;
+                var boundPort = NativeMethods.OpenApiPort();
+                if (boundPort > 0) PortBox.Text = boundPort.ToString();
+                ShowApiStatus($"OpenAPI 已启动（:{boundPort}）。", isError: false);
+            }
+            catch (Exception ex)
+            {
+                ShowApiStatus($"启动失败：{ex.Message}", isError: true);
             }
         }
 
-        // Rotate the bearer token and refresh the display.
+        private void StopApiBtn_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                NativeMethods.StopOpenApi();
+                TokenBox.Text = "";
+                ShowApiStatus("OpenAPI 已停止。", isError: false);
+            }
+            catch (Exception ex)
+            {
+                ShowApiStatus($"停止失败：{ex.Message}", isError: true);
+            }
+        }
+
         private void RotateTokenBtn_Click(object sender, RoutedEventArgs e)
         {
             try
             {
                 var newToken = NativeMethods.TokenRotate();
                 if (newToken.StartsWith("error:"))
-                {
-                    ShowStatus(newToken, isError: true);
-                }
+                    ShowApiStatus(newToken, isError: true);
                 else
                 {
                     TokenBox.Text = newToken;
-                    ShowStatus("Token rotated.", isError: false);
+                    ShowApiStatus("Token 已轮换。", isError: false);
                 }
             }
-            catch
+            catch (Exception ex)
             {
-                ShowStatus("FFI not loaded — rotate unavailable.", isError: true);
+                ShowApiStatus($"FFI 不可用：{ex.Message}", isError: true);
             }
         }
 
-        private void ShowStatus(string message, bool isError)
+        // ── Status helpers ──────────────────────────────────────────────────────
+
+        private static void ShowInlineStatus(TextBlock tb, string msg, bool isError)
         {
-            if (string.IsNullOrEmpty(message))
-            {
-                SaveStatusText.Visibility = Visibility.Collapsed;
-                return;
-            }
-            SaveStatusText.Text = message;
-            SaveStatusText.Foreground = isError
+            tb.Text = msg;
+            tb.Foreground = isError
                 ? (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["SystemFillColorCriticalBrush"]
                 : (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["TextFillColorPrimaryBrush"];
-            SaveStatusText.Visibility = Visibility.Visible;
+            tb.Visibility = Visibility.Visible;
+        }
+
+        private void ShowApiStatus(string msg, bool isError)
+        {
+            ShowInlineStatus(SaveStatusText, msg, isError);
         }
     }
 }

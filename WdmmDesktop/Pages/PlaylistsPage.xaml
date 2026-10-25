@@ -7,173 +7,149 @@
 
     <!-- No Background: Mica shows through -->
     <Grid>
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="*" />
-        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="260" MinWidth="0" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
 
-        <!-- Server-down warning (hidden when OpenAPI is running) -->
-        <InfoBar x:Name="ServerInfoBar"
-                 Grid.Row="0"
-                 IsOpen="True"
-                 IsClosable="False"
-                 Severity="Warning"
-                 Margin="12,10,12,0"
-                 Title="OpenAPI server required"
-                 Message="Playlists need OpenAPI. Open Settings (gear) → Start server. Direct FFI wdmm_playlist_list is not exported yet @ d8b2217." />
+        <!-- Left: playlist list -->
+        <Grid Grid.Column="0">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
 
-        <!-- Main layout: list left, detail right -->
-        <ContentControl x:Name="MainGrid"
-                        Grid.Row="1"
+            <TextBlock Grid.Row="0"
+                       Text="Playlists"
+                       FontWeight="SemiBold"
+                       FontSize="13"
+                       Margin="14,14,14,6" />
+
+            <ListView x:Name="PlaylistList"
+                      Grid.Row="1"
+                      SelectionMode="Single"
+                      SelectionChanged="PlaylistList_SelectionChanged"
+                      Margin="8,0,8,0">
+                <ListView.ItemTemplate>
+                    <DataTemplate>
+                        <StackPanel Spacing="2" Padding="4,6">
+                            <TextBlock Text="{Binding Name}"
+                                       FontSize="13"
+                                       FontWeight="SemiBold"
+                                       TextTrimming="CharacterEllipsis" />
+                            <TextBlock Text="{Binding DisplaySub}"
+                                       FontSize="11"
+                                       Opacity="0.5"
+                                       TextTrimming="CharacterEllipsis" />
+                        </StackPanel>
+                    </DataTemplate>
+                </ListView.ItemTemplate>
+            </ListView>
+
+            <!-- Add / Delete / Refresh buttons -->
+            <StackPanel Grid.Row="2"
+                        Orientation="Horizontal"
+                        Spacing="6"
+                        Margin="10,6,10,12">
+                <Button x:Name="AddBtn"
+                        Click="AddBtn_Click"
+                        ToolTipService.ToolTip="Create playlist"
+                        Padding="10,8">
+                    <FontIcon Glyph="&#xE710;" FontSize="14" />
+                </Button>
+                <Button x:Name="DeleteBtn"
+                        Click="DeleteBtn_Click"
                         IsEnabled="False"
-                        HorizontalContentAlignment="Stretch"
-                        VerticalContentAlignment="Stretch">
-        <Grid>
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="260" MinWidth="0" />
-                <ColumnDefinition Width="*" />
-            </Grid.ColumnDefinitions>
+                        ToolTipService.ToolTip="Delete selected playlist"
+                        Padding="10,8">
+                    <FontIcon Glyph="&#xE74D;" FontSize="14" />
+                </Button>
+                <Button x:Name="RefreshBtn"
+                        Click="RefreshBtn_Click"
+                        ToolTipService.ToolTip="Reload from library"
+                        Padding="10,8">
+                    <FontIcon Glyph="&#xE72C;" FontSize="14" />
+                </Button>
+            </StackPanel>
+        </Grid>
 
-            <!-- Left: playlist list -->
-            <Grid Grid.Column="0">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="*" />
-                    <RowDefinition Height="Auto" />
-                </Grid.RowDefinitions>
+        <!-- Right: entries detail -->
+        <Grid Grid.Column="1">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
 
-                <TextBlock Grid.Row="0"
-                           Text="Playlists"
-                           FontWeight="SemiBold"
-                           FontSize="13"
-                           Margin="14,14,14,6" />
+            <TextBlock x:Name="DetailTitle"
+                       Grid.Row="0"
+                       Text="Select a playlist"
+                       FontSize="15"
+                       FontWeight="SemiBold"
+                       Margin="20,14,20,6" />
 
-                <ListView x:Name="PlaylistList"
-                          Grid.Row="1"
-                          SelectionMode="Single"
-                          SelectionChanged="PlaylistList_SelectionChanged"
-                          Margin="8,0,8,0">
-                    <ListView.ItemTemplate>
-                        <DataTemplate>
-                            <StackPanel Spacing="2" Padding="4,6">
-                                <TextBlock Text="{Binding Name}"
+            <ListView x:Name="EntryList"
+                      Grid.Row="1"
+                      Margin="12,0,12,0"
+                      SelectionMode="None">
+                <ListView.ItemTemplate>
+                    <DataTemplate>
+                        <Grid Padding="4,5" ColumnSpacing="8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0"
+                                       Text="{Binding Position}"
+                                       FontSize="11"
+                                       Opacity="0.35"
+                                       VerticalAlignment="Center"
+                                       FontFamily="Cascadia Mono,Consolas,monospace"
+                                       MinWidth="24" />
+                            <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+                                <TextBlock Text="{Binding Title}"
                                            FontSize="13"
                                            FontWeight="SemiBold"
                                            TextTrimming="CharacterEllipsis" />
-                                <TextBlock Text="{Binding DisplaySub}"
+                                <TextBlock Text="{Binding SubLine}"
                                            FontSize="11"
                                            Opacity="0.5"
                                            TextTrimming="CharacterEllipsis" />
                             </StackPanel>
-                        </DataTemplate>
-                    </ListView.ItemTemplate>
-                </ListView>
+                            <TextBlock Grid.Column="2"
+                                       Text="{Binding DurationDisplay}"
+                                       FontSize="11"
+                                       Opacity="0.5"
+                                       VerticalAlignment="Center"
+                                       FontFamily="Cascadia Mono,Consolas,monospace" />
+                        </Grid>
+                    </DataTemplate>
+                </ListView.ItemTemplate>
+            </ListView>
 
-                <!-- Add / Delete / Refresh buttons -->
-                <StackPanel Grid.Row="2"
-                            Orientation="Horizontal"
-                            Spacing="6"
-                            Margin="10,6,10,12">
-                    <Button x:Name="AddBtn"
-                            Click="AddBtn_Click"
-                            ToolTipService.ToolTip="Create playlist"
-                            Padding="10,8">
-                        <FontIcon Glyph="&#xE710;" FontSize="14" />
-                    </Button>
-                    <Button x:Name="DeleteBtn"
-                            Click="DeleteBtn_Click"
-                            IsEnabled="False"
-                            ToolTipService.ToolTip="Delete selected playlist"
-                            Padding="10,8">
-                        <FontIcon Glyph="&#xE74D;" FontSize="14" />
-                    </Button>
-                    <Button x:Name="RefreshBtn"
-                            Click="RefreshBtn_Click"
-                            ToolTipService.ToolTip="Reload from server"
-                            Padding="10,8">
-                        <FontIcon Glyph="&#xE72C;" FontSize="14" />
-                    </Button>
-                </StackPanel>
-            </Grid>
+            <!-- Empty / error state for entries -->
+            <StackPanel x:Name="EntryEmptyState"
+                        Grid.Row="1"
+                        VerticalAlignment="Center"
+                        HorizontalAlignment="Center"
+                        Spacing="8"
+                        Visibility="Collapsed">
+                <FontIcon Glyph="&#xE762;" FontSize="36" Opacity="0.3" />
+                <TextBlock x:Name="EntryEmptyText"
+                           FontSize="13"
+                           Opacity="0.5"
+                           HorizontalAlignment="Center" />
+            </StackPanel>
 
-            <!-- Right: entries detail -->
-            <Grid Grid.Column="1">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="*" />
-                    <RowDefinition Height="Auto" />
-                </Grid.RowDefinitions>
-
-                <TextBlock x:Name="DetailTitle"
-                           Grid.Row="0"
-                           Text="Select a playlist"
-                           FontSize="15"
-                           FontWeight="SemiBold"
-                           Margin="20,14,20,6" />
-
-                <ListView x:Name="EntryList"
-                          Grid.Row="1"
-                          Margin="12,0,12,0"
-                          SelectionMode="None">
-                    <ListView.ItemTemplate>
-                        <DataTemplate>
-                            <Grid Padding="4,5" ColumnSpacing="8">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto" />
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Grid.Column="0"
-                                           Text="{Binding Position}"
-                                           FontSize="11"
-                                           Opacity="0.35"
-                                           VerticalAlignment="Center"
-                                           FontFamily="Cascadia Mono,Consolas,monospace"
-                                           MinWidth="24" />
-                                <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
-                                    <TextBlock Text="{Binding Title}"
-                                               FontSize="13"
-                                               FontWeight="SemiBold"
-                                               TextTrimming="CharacterEllipsis" />
-                                    <TextBlock Text="{Binding SubLine}"
-                                               FontSize="11"
-                                               Opacity="0.5"
-                                               TextTrimming="CharacterEllipsis" />
-                                </StackPanel>
-                                <TextBlock Grid.Column="2"
-                                           Text="{Binding DurationDisplay}"
-                                           FontSize="11"
-                                           Opacity="0.5"
-                                           VerticalAlignment="Center"
-                                           FontFamily="Cascadia Mono,Consolas,monospace" />
-                            </Grid>
-                        </DataTemplate>
-                    </ListView.ItemTemplate>
-                </ListView>
-
-                <!-- Empty / error state for entries -->
-                <StackPanel x:Name="EntryEmptyState"
-                            Grid.Row="1"
-                            VerticalAlignment="Center"
-                            HorizontalAlignment="Center"
-                            Spacing="8"
-                            Visibility="Collapsed">
-                    <FontIcon Glyph="&#xE762;" FontSize="36" Opacity="0.3" />
-                    <TextBlock x:Name="EntryEmptyText"
-                               FontSize="13"
-                               Opacity="0.5"
-                               HorizontalAlignment="Center" />
-                </StackPanel>
-
-                <!-- Status / error bar -->
-                <TextBlock x:Name="StatusBar"
-                           Grid.Row="2"
-                           Margin="14,4,14,10"
-                           FontSize="11"
-                           Opacity="0.45"
-                           TextWrapping="Wrap" />
-            </Grid>
+            <!-- Status / error bar -->
+            <TextBlock x:Name="StatusBar"
+                       Grid.Row="2"
+                       Margin="14,4,14,10"
+                       FontSize="11"
+                       Opacity="0.45"
+                       TextWrapping="Wrap" />
         </Grid>
-        </ContentControl>
     </Grid>
 </Page>

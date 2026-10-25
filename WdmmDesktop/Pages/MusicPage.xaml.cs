@@ -6,6 +6,7 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Navigation;
 using WdmmDesktop.Generated;
 using WdmmDesktop.Models;
+using WdmmDesktop.Dialogs;
 using WdmmDesktop;
 
 namespace WdmmDesktop.Pages
@@ -110,16 +111,18 @@ namespace WdmmDesktop.Pages
             LoadTracks(string.IsNullOrEmpty(q) ? null : q);
         }
 
-        private void CastBtn_Click(object sender, RoutedEventArgs e)
+        private async void CastBtn_Click(object sender, RoutedEventArgs e)
         {
             if (sender is Button btn && btn.Tag is TrackItem track)
             {
-                // Hand off selected track to CastPage via cross-page state.
-                AppState.PendingCastTrack = track;
-                // Navigate to CastPage — MainWindow will handle the routing.
-                Frame.Navigate(typeof(CastPage));
-                // Mirror the sidebar selection via the MainWindow.
-                (App.MainWindow as MainWindow)?.SelectNavItem("Cast");
+                // Open the Cast dialog with the selected track — no sidebar navigation.
+                // Casting is a transient device-picker flow, not a primary destination
+                // (Android parity: no Cast drawer entry).
+                var dialog = new CastDialog(track)
+                {
+                    XamlRoot = XamlRoot
+                };
+                await dialog.ShowAsync();
             }
         }
     }

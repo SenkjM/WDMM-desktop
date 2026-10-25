@@ -157,17 +157,6 @@
                             </StackPanel>
                         </RadioButton>
 
-                        <RadioButton x:Name="NavCast"
-                                     GroupName="ShellNav"
-                                     Tag="Cast"
-                                     Checked="NavItem_Checked"
-                                     Style="{StaticResource NavItemStyle}">
-                            <StackPanel Orientation="Horizontal" Spacing="12">
-                                <FontIcon Glyph="&#xE93E;" FontSize="16" />
-                                <TextBlock x:Name="LblCast" Text="Cast" VerticalAlignment="Center" />
-                            </StackPanel>
-                        </RadioButton>
-
                         <RadioButton x:Name="NavAbout"
                                      GroupName="ShellNav"
                                      Tag="About"

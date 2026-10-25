@@ -128,6 +128,38 @@ namespace WdmmDesktop.Generated
             IntPtr webdavPass,
             IntPtr remoteDir);
 
+        /// <summary>
+        /// Trigger a sync run with managed strings. Returns a JSON summary
+        /// or "error:…". Never throws on FFI load failure (Linux dev box tolerated).
+        /// </summary>
+        public static string WithNativeSyncTrigger(
+            string webdavUrl, string webdavUser, string webdavPass, string remoteDir)
+        {
+            var b1 = System.Text.Encoding.UTF8.GetBytes(webdavUrl + '\0');
+            var b2 = System.Text.Encoding.UTF8.GetBytes(webdavUser + '\0');
+            var b3 = System.Text.Encoding.UTF8.GetBytes(webdavPass + '\0');
+            var b4 = System.Text.Encoding.UTF8.GetBytes(remoteDir + '\0');
+            var p1 = Marshal.AllocHGlobal(b1.Length);
+            var p2 = Marshal.AllocHGlobal(b2.Length);
+            var p3 = Marshal.AllocHGlobal(b3.Length);
+            var p4 = Marshal.AllocHGlobal(b4.Length);
+            try
+            {
+                Marshal.Copy(b1, 0, p1, b1.Length);
+                Marshal.Copy(b2, 0, p2, b2.Length);
+                Marshal.Copy(b3, 0, p3, b3.Length);
+                Marshal.Copy(b4, 0, p4, b4.Length);
+                return wdmm_sync_trigger(p1, p2, p3, p4).ToStringAndFree();
+            }
+            finally
+            {
+                Marshal.FreeHGlobal(p1);
+                Marshal.FreeHGlobal(p2);
+                Marshal.FreeHGlobal(p3);
+                Marshal.FreeHGlobal(p4);
+            }
+        }
+
         // ── DLNA (Round 4) ────────────────────────────────────────────────────
 
         /// <summary>
@@ -597,6 +629,183 @@ namespace WdmmDesktop.Generated
             var ptr   = Marshal.AllocHGlobal(bytes.Length);
             try   { Marshal.Copy(bytes, 0, ptr, bytes.Length); return wdmm_proxy_renew_stream_callback(ptr, cb, userData).ToStringAndFree(); }
             finally { Marshal.FreeHGlobal(ptr); }
+        }
+
+        // ── User Folders (Core 6a02b3b) ───────────────────────────────────────
+        // Requires wdmm_library_init first. Virtual root: parent_id null/""/"root".
+
+        /// <summary>List direct children of a folder. parentId null / "" / "root" → virtual root.</summary>
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern FfiString wdmm_user_folder_list_children(IntPtr parentId);
+
+        /// <summary>Create a folder from JSON {"name":"…","parent_id":null,"sort_order":0}. Returns folder JSON.</summary>
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern FfiString wdmm_user_folder_create(IntPtr json);
+
+        /// <summary>Rename a folder by id. Returns "ok" or "error:…".</summary>
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern FfiString wdmm_user_folder_rename(IntPtr id, IntPtr name);
+
+        /// <summary>Move a folder to a new parent. newParentId null / "" / "root" → virtual root.</summary>
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern FfiString wdmm_user_folder_move(IntPtr id, IntPtr newParentId);
+
+        /// <summary>Delete a folder and all descendants recursively. Returns "ok" or "error:…".</summary>
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern FfiString wdmm_user_folder_delete(IntPtr id);
+
+        /// <summary>List items in a folder. folderId "root" = virtual-root items. Returns JSON array.</summary>
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern FfiString wdmm_user_folder_list_items(IntPtr folderId);
+
+        /// <summary>Add/update an item ref from JSON. Returns "ok" or "error:…".</summary>
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern FfiString wdmm_user_folder_add_item(IntPtr json);
+
+        /// <summary>Remove an item by (folder_id, ref_kind, ref_key). Returns "ok" or "error:…".</summary>
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern FfiString wdmm_user_folder_remove_item(
+            IntPtr folderId, IntPtr refKind, IntPtr refKey);
+
+        // ── Playlists (Core 6a02b3b) ──────────────────────────────────────────
+        // Requires wdmm_library_init first.
+
+        /// <summary>List all playlists ordered by name. Returns JSON array or "error:…".</summary>
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern FfiString wdmm_playlist_list();
+
+        /// <summary>Create a playlist from JSON {"id":"optional","name":"…"}. Returns playlist JSON or "error:…".</summary>
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern FfiString wdmm_playlist_create(IntPtr json);
+
+        /// <summary>Delete a playlist and all entries (ON DELETE CASCADE). Returns "ok" or "error:…".</summary>
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern FfiString wdmm_playlist_delete(IntPtr id);
+
+        /// <summary>List entries of a playlist ordered by position. Returns JSON array or "error:…".</summary>
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern FfiString wdmm_playlist_list_entries(IntPtr id);
+
+        /// <summary>
+        /// Replace all entries of a playlist atomically.
+        /// jsonArray is a JSON array of {music_id, source_name, remote_path, title, duration_ms}.
+        /// Returns "ok" or "error:…".
+        /// </summary>
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern FfiString wdmm_playlist_set_entries(IntPtr id, IntPtr jsonArray);
+
+        // ── User Folder convenience wrappers ──────────────────────────────────
+
+        /// <summary>List direct children. Pass null or "root" for virtual root.</summary>
+        public static string UserFolderListChildren(string? parentId)
+        {
+            if (string.IsNullOrEmpty(parentId) || parentId == "root")
+                return wdmm_user_folder_list_children(IntPtr.Zero).ToStringAndFree();
+            return WithNativeString(parentId, wdmm_user_folder_list_children);
+        }
+
+        /// <summary>Create a folder from JSON. Returns new folder JSON or "error:…".</summary>
+        public static string UserFolderCreate(string json)
+            => WithNativeString(json, wdmm_user_folder_create);
+
+        /// <summary>Rename a folder by id. Returns "ok" or "error:…".</summary>
+        public static string UserFolderRename(string id, string name)
+            => WithNativeString2(id, name, wdmm_user_folder_rename);
+
+        /// <summary>Move a folder to a new parent. Pass null or "root" for virtual root.</summary>
+        public static string UserFolderMove(string id, string? newParentId)
+        {
+            if (string.IsNullOrEmpty(newParentId) || newParentId == "root")
+                return WithNativeString(id, p => wdmm_user_folder_move(p, IntPtr.Zero));
+            return WithNativeString2(id, newParentId, wdmm_user_folder_move);
+        }
+
+        /// <summary>Delete a folder recursively. Returns "ok" or "error:…".</summary>
+        public static string UserFolderDelete(string id)
+            => WithNativeString(id, wdmm_user_folder_delete);
+
+        /// <summary>List items in a folder. Pass "root" for virtual-root items.</summary>
+        public static string UserFolderListItems(string folderId)
+            => WithNativeString(folderId, wdmm_user_folder_list_items);
+
+        /// <summary>Add/update an item reference. Returns "ok" or "error:…".</summary>
+        public static string UserFolderAddItem(string json)
+            => WithNativeString(json, wdmm_user_folder_add_item);
+
+        /// <summary>Remove an item by (folderId, refKind, refKey). Returns "ok" or "error:…".</summary>
+        public static string UserFolderRemoveItem(string folderId, string refKind, string refKey)
+            => WithNativeString3(folderId, refKind, refKey, wdmm_user_folder_remove_item);
+
+        // ── Playlist convenience wrappers ──────────────────────────────────────
+
+        /// <summary>List all playlists as a JSON array.</summary>
+        public static string PlaylistList()
+            => wdmm_playlist_list().ToStringAndFree();
+
+        /// <summary>Create a playlist from JSON. Returns new playlist JSON or "error:…".</summary>
+        public static string PlaylistCreate(string json)
+            => WithNativeString(json, wdmm_playlist_create);
+
+        /// <summary>Delete a playlist and its entries. Returns "ok" or "error:…".</summary>
+        public static string PlaylistDelete(string id)
+            => WithNativeString(id, wdmm_playlist_delete);
+
+        /// <summary>List entries of a playlist. Returns JSON array or "error:…".</summary>
+        public static string PlaylistListEntries(string id)
+            => WithNativeString(id, wdmm_playlist_list_entries);
+
+        /// <summary>Replace all entries of a playlist. jsonArray is a JSON array of entry objects.</summary>
+        public static string PlaylistSetEntries(string id, string jsonArray)
+            => WithNativeString2(id, jsonArray, wdmm_playlist_set_entries);
+
+        // ── Multi-arg string helpers ───────────────────────────────────────────
+
+        /// <summary>Marshal two managed strings to native UTF-8 and invoke fn.</summary>
+        private static string WithNativeString2(
+            string s1, string s2,
+            Func<IntPtr, IntPtr, FfiString> fn)
+        {
+            var b1 = System.Text.Encoding.UTF8.GetBytes(s1 + '\0');
+            var b2 = System.Text.Encoding.UTF8.GetBytes(s2 + '\0');
+            var p1 = Marshal.AllocHGlobal(b1.Length);
+            var p2 = Marshal.AllocHGlobal(b2.Length);
+            try
+            {
+                Marshal.Copy(b1, 0, p1, b1.Length);
+                Marshal.Copy(b2, 0, p2, b2.Length);
+                return fn(p1, p2).ToStringAndFree();
+            }
+            finally
+            {
+                Marshal.FreeHGlobal(p1);
+                Marshal.FreeHGlobal(p2);
+            }
+        }
+
+        /// <summary>Marshal three managed strings to native UTF-8 and invoke fn.</summary>
+        private static string WithNativeString3(
+            string s1, string s2, string s3,
+            Func<IntPtr, IntPtr, IntPtr, FfiString> fn)
+        {
+            var b1 = System.Text.Encoding.UTF8.GetBytes(s1 + '\0');
+            var b2 = System.Text.Encoding.UTF8.GetBytes(s2 + '\0');
+            var b3 = System.Text.Encoding.UTF8.GetBytes(s3 + '\0');
+            var p1 = Marshal.AllocHGlobal(b1.Length);
+            var p2 = Marshal.AllocHGlobal(b2.Length);
+            var p3 = Marshal.AllocHGlobal(b3.Length);
+            try
+            {
+                Marshal.Copy(b1, 0, p1, b1.Length);
+                Marshal.Copy(b2, 0, p2, b2.Length);
+                Marshal.Copy(b3, 0, p3, b3.Length);
+                return fn(p1, p2, p3).ToStringAndFree();
+            }
+            finally
+            {
+                Marshal.FreeHGlobal(p1);
+                Marshal.FreeHGlobal(p2);
+                Marshal.FreeHGlobal(p3);
+            }
         }
 
         /// <summary>
