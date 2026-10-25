@@ -27,6 +27,7 @@ namespace WdmmDesktop.Dialogs
         public SettingsDialog(string ffiVersion)
         {
             InitializeComponent();
+            ShowPanel("Home");
             _ffiVersion = ffiVersion;
             FfiVersionText.Text = $"wdmm-core {ffiVersion}";
 
@@ -46,6 +47,10 @@ namespace WdmmDesktop.Dialogs
 
         private void ShowPanel(string tag)
         {
+            // NavHome IsChecked=True fires Checked during InitializeComponent before
+            // later x:Name panels are assigned — guard until the tree is ready.
+            if (PanelHome is null || PanelOpenApi is null) return;
+
             PanelHome.Visibility     = tag == "Home"     ? Visibility.Visible : Visibility.Collapsed;
             PanelLibrary.Visibility  = tag == "Library" ? Visibility.Visible : Visibility.Collapsed;
             PanelNetwork2.Visibility = tag == "Network2" ? Visibility.Visible : Visibility.Collapsed;
