@@ -118,13 +118,51 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          # Clear PublishProfile (csproj points at missing win-x64.pubxml).
-          # EnableMsixTooling stays in csproj; WindowsPackageType=None keeps unpackaged.
-          if ! dotnet publish WdmmDesktop/WdmmDesktop.csproj             -c Release             -r win-x64             --self-contained true             -p:Platform=x64             -p:PublishProfile=             -p:WindowsPackageType=None             -p:WindowsAppSDKSelfContained=true             -p:EnableMsixTooling=false             -o publish/win-x64             -v:n; then
-            echo "::error::dotnet publish failed; dumping XamlCompiler leftovers if any"
-            find WdmmDesktop/obj -name 'output.json' -o -name '*.xaml' -path '*/intermediate/*' 2>/dev/null | head -20 || true
-            find WdmmDesktop/obj -name 'output.json' -print -exec python -c "import json,sys; p=sys.argv[1]; d=json.load(open(p,encoding='utf-8')); print(json.dumps(d,indent=2)[:8000])" {} \; 2>/dev/null | head -200 || true
-            find WdmmDesktop/obj -name '*.err' -o -name '*Xaml*' 2>/dev/null | head -40 || true
+          # csproj now ships Properties/PublishProfiles/win-x64.pubxml and pins
+          # WindowsPackageType=None + WindowsAppSDKSelfContained=true, so we
+          # publish against the existing pubxml instead of clearing PublishProfile.
+          # EnableMsixTooling stays true in the csproj (Microsoft's unpackaged
+          # pattern with WindowsPackageType=None).
+          if ! dotnet publish WdmmDesktop/WdmmDesktop.csproj \
+                -c Release \
+                -r win-x64 \
+                --self-contained true \
+                -p:Platform=x64 \
+                -p:WindowsPackageType=None \
+                -p:WindowsAppSDKSelfContained=true \
+                -o publish/win-x64 \
+                -v:n; then
+            echo "::error::dotnet publish failed; dumping XamlCompiler / obj leftovers"
+
+            # 1) Locate every input.json / output.json the XamlCompiler wrote.
+            echo "--- obj tree: input.json / output.json ---"
+            find WdmmDesktop/obj -type f \( -name 'input.json' -o -name 'output.json' \) -print 2>/dev/null || true
+
+            # 2) Raw-dump each (truncate ~8k) even if JSON parse fails later.
+            for f in $(find WdmmDesktop/obj -type f \( -name 'input.json' -o -name 'output.json' \) 2>/dev/null); do
+              echo "===== $f ====="
+              head -c 8192 "$f" 2>/dev/null || true
+              echo ""
+            done
+
+            # 3) Pretty-print output.json via a python fallback chain.
+            PY_BIN=""
+            for c in py python3 python; do
+              if command -v "$c" >/dev/null 2>&1; then PY_BIN="$c"; break; fi
+            done
+            if [ -n "$PY_BIN" ]; then
+              for f in $(find WdmmDesktop/obj -type f -name 'output.json' 2>/dev/null); do
+                echo "----- parsed: $f -----"
+                "$PY_BIN" -c "import json,sys; p=sys.argv[1]; d=json.load(open(p,encoding='utf-8')); print(json.dumps(d,indent=2)[:8000])" "$f" 2>/dev/null || true
+              done
+            fi
+
+            # 4) Equivalent of `dir /s WdmmDesktop\obj\*Xaml*` + any .err/.log.
+            echo "--- XamlCompiler-related files under obj ---"
+            find WdmmDesktop/obj -type f -iname '*xaml*' -print 2>/dev/null | head -40 || true
+            echo "--- .err / .log under obj ---"
+            find WdmmDesktop/obj -type f \( -name '*.err' -o -name '*.log' \) -print 2>/dev/null | head -40 || true
+
             exit 1
           fi
 

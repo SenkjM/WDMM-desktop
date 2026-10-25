@@ -43,7 +43,7 @@
             </Grid.ColumnDefinitions>
 
             <!-- SIDEBAR PANEL -->
-            <Grid x:Name="SidebarPanel" Grid.Column="0" ClipToBounds="True">
+            <Grid x:Name="SidebarPanel" Grid.Column="0">
 
                 <!-- Right-edge 1-dp divider; not hit-testable -->
                 <Rectangle Width="1"
