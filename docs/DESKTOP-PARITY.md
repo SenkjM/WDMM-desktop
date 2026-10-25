@@ -125,7 +125,7 @@ opt-in HTTP surface for external clients (Settings → 第三方/开发者).
 
 ## Submodule
 
-Current SHA pinned: **e64108f** (import v6: `import_from_sqflite` copies deleted_tracks + sync_state with v6 backfill; new `wdmm_library_compare_with_sqflite` FFI).
+Current SHA pinned: **169f4ff** (import v6: `import_from_sqflite` copies deleted_tracks + sync_state with v6 backfill; new `wdmm_library_compare_with_sqflite` FFI).
 
 ---
 
