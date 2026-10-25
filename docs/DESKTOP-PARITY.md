@@ -41,7 +41,7 @@ Chrome rules are unchanged from the shell demo:
 | **Music** | **real** | Track list from `wdmm_track_list()`. AutoSuggestBox search via `wdmm_track_search()`. Cast button hands off track to CastPage via `AppState.PendingCastTrack`. |
 | **Playlists** | **real (FFI)** | `wdmm_playlist_*` NativeMethods wired; OpenAPI bridge remains for third-party. |
 | **Manga** | **real** | `wdmm_manga_list` / `_get` / `_list_pages` / `_list_progress` read; detail dialog writes via `wdmm_manga_upsert` / `_set_progress` / `_delete`. |
-| **File source (Network)** | **real** | Directory browse via `wdmm_webdav_list/mkdir/rename/remove`; sources via `wdmm_account_*`; remember-path settings FFI; Settings sync uses selected source + `wdmm_sync_trigger`. i18n zh/en via Loc + Resources.resw. |
+| **File source (Network)** | **real** | Multi-provider directory browse via `wdmm_account_list_dir/mkdir/rename/remove` (Core account FFI); 9 providers: webdav, baidu_netdisk, 123_open, 115open, aliyundrive_open, terabox, netease_music, ctfile, crypt; sources via `wdmm_account_*`; remember-path settings FFI; Settings sync uses selected source + `wdmm_sync_trigger`. i18n zh/en via Loc + Resources.resw. Fallback to legacy `wdmm_webdav_*` for accounts without ID. |
 | **Tasks** | **real** | Queue list from `wdmm_queue_status_json()`. Pending count badge. Per-task cancel via `wdmm_queue_cancel`. |
 | **Cast / DLNA** | **real** | DMR discovery via `wdmm_dlna_discover_json(2000 ms)`. USN-keyed prefs in Core independent `dmr_prefs.db` via `wdmm_dmr_prefs_*` (`force_direct` + `override_name`); one-shot migrate from legacy `dmr_prefs.json` → `.bak`. Proxy-only cast; single-file mutex; HLS unlocked. LocalStream refuses until cloud/crypt drivers. NetworkDirect refuses (cache first). No silent HLS↔direct fallback. |
 | **Settings** | **real** | TabView chrome (920×640). Sync: `sync_remote_root` / `sync_interval` / `playlist_sync_enabled` / `sync_encrypt_password` KV + `wdmm_sync_trigger`. Backup: passphrase + `backup_remote_path` + `wdmm_backup_upload` / `_list` / `_download_restore` (WDMMBK01/WDMMEN01). Sources via `wdmm_account_*`. Library `media_scan_*`. OpenAPI third-party only. |
@@ -101,8 +101,9 @@ Cast / DLNA locked rules (unchanged — mirrors Android):
 | `wdmm_proxy_stream_alloc_buf` / `_free_buf` | ✓ | NativeMethods (bindings present) |
 | `wdmm_proxy_register_stream` | ✓ | NativeMethods (binding + wrapper present; CastPage hook prepared — no stream source yet) |
 | `wdmm_proxy_renew_stream_callback` | ✓ | NativeMethods (binding + wrapper present) |
-| `wdmm_webdav_list` / `_mkdir` / `_rename` / `_remove` | ✓ | NetworkPage (File source) |
+| `wdmm_webdav_list` / `_mkdir` / `_rename` / `_remove` | ✓ | NetworkPage (legacy fallback; accounts without ID) |
 | `wdmm_account_list` / `_get` / `_upsert` / `_delete` | ✓ | AccountStore → NetworkPage + Settings sync picker |
+| `wdmm_account_list_dir` / `_mkdir` / `_rename` / `_remove` | ✓ | NetworkPage (multi-provider browse via CloudFfi) |
 | `wdmm_playlist_list` / `_create` / `_delete` / `_list_entries` / `_set_entries` | ✓ | PlaylistsPage (FFI) |
 | `wdmm_manga_*` | ✓ | MangaPage read + upsert/set_progress/delete |
 
@@ -117,7 +118,7 @@ opt-in HTTP surface for external clients (Settings → 第三方/开发者).
 
 ## Submodule
 
-Current SHA pinned: **9d01e09** (`wdmm_backup_*` + `wdmm_dmr_prefs_*` on Core main).
+Current SHA pinned: **2571e01** (Wave C driver FFI: `wdmm_driver_*` + `wdmm_account_list_dir` on Core main).
 
 ---
 
@@ -179,13 +180,14 @@ dotnet build -c Debug
 | `WdmmDesktop/Models/TrackItem.cs` | Track POCO (System.Text.Json) |
 | `WdmmDesktop/Models/QueueTask.cs` | Queue task POCO |
 | `WdmmDesktop/Models/DmrDevice.cs` | DMR device + DmrPref POCOs; locked cast rule docs |
-| `WdmmDesktop/Models/WebDavAccount.cs` | WebDAV account POCO |
+| `WdmmDesktop/Models/WebDavAccount.cs` | **UPDATED** — free-form credentials dictionary for multi-provider support (Wave C) |
 | `WdmmDesktop/Models/PlaylistItem.cs` | **NEW** — PlaylistItem + PlaylistEntryItem POCOs (OpenAPI shapes) |
 | `WdmmDesktop/Pages/FoldersPage.xaml/.cs` | **UPDATED** — source toggle (Local/Remote), WebDAV blocked InfoBar, empty/error states |
 | `WdmmDesktop/Pages/MusicPage.xaml/.cs` | Track list + search (real FFI); Cast button |
 | `WdmmDesktop/Pages/PlaylistsPage.xaml/.cs` | **UPDATED** — full OpenAPI bridge; two-pane list+entries; create/delete dialogs |
 | `WdmmDesktop/Pages/MangaPage.xaml/.cs` | **UPDATED** — list + detail write (upsert/progress/delete) via manga FFI |
-| `WdmmDesktop/Pages/NetworkPage.xaml/.cs` | File source directory browser (`wdmm_webdav_*` + `wdmm_account_*`); Loc i18n |
+| `WdmmDesktop/Pages/NetworkPage.xaml/.cs` | **UPDATED** — multi-provider support (9 providers); dynamic credential fields per provider; browse via CloudFfi account FFI |
+| `WdmmDesktop/Services/CloudFfi.cs` | **NEW** — public FFI facade for driver and account operations (Wave C) |
 | `WdmmDesktop/Pages/TasksPage.xaml/.cs` | Queue list + cancel (real FFI) |
 | `WdmmDesktop/Pages/CastPage.xaml/.cs` | DLNA discovery + proxy cast; locked rules enforced |
 | `WdmmDesktop/Pages/AboutPage.xaml/.cs` | **UPDATED** — parity matrix reflects Folders/Playlists/Manga + HLS deferred |
@@ -199,7 +201,7 @@ dotnet build -c Debug
 | `WdmmDesktop/Pages/CastPage.xaml/.cs` | **UPDATED** — HLS unlocked; ContentDeliveryKind cast path; LocalStream hook; NetworkDirect refuse |
 | `WdmmDesktop/Models/DmrDevice.cs` | **UPDATED** — comments reflect HLS live; `_activeTokenIsHls` mutex docs |
 | `WdmmDesktop/Pages/AboutPage.xaml/.cs` | **UPDATED** — parity matrix reflects HLS live; LocalStream/NetworkDirect status |
-| `docs/DESKTOP-PARITY.md` | **UPDATED** — this file; HLS section + FFI matrix + submodule SHA |
+| `docs/DESKTOP-PARITY.md` | **UPDATED** — this file; HLS section + FFI matrix + submodule SHA + Wave C multi-provider |
 
 ---
 
@@ -220,6 +222,6 @@ dotnet build -c Debug
 
 ## Settings / Backup / DMR (2026-10-25)
 
-- Core `9d01e09`: `wdmm_account_*`, `wdmm_backup_*` (WDMMBK01/WDMMEN01, PBKDF2 120k), independent `dmr_prefs.db` + `wdmm_dmr_prefs_*`.
-- Desktop: AccountStore; Settings TabView Sync+Backup wired; Cast DMR prefs via FFI (json migrate); Manga write UI; File source browse FFI.
-- Still out of scope / true blockers: full Android binary vault/playlist section shapes may not round-trip with Core JSON BK sections; LocalStream cast needs desktop cloud/crypt drivers; local-lib folder mount extras (post-refactor).
+- Core `2571e01` (Wave C): `wdmm_driver_*`, `wdmm_account_list_dir`, `wdmm_account_*`, `wdmm_backup_*` (WDMMBK01/WDMMEN01, PBKDF2 120k), independent `dmr_prefs.db` + `wdmm_dmr_prefs_*`.
+- Desktop: AccountStore; Settings TabView Sync+Backup wired; Cast DMR prefs via FFI (json migrate); Manga write UI; **File source multi-provider via Core account FFI (webdav, baidu_netdisk, 123_open, 115open, aliyundrive_open, terabox, netease_music, ctfile, crypt)**.
+- Still out of scope / true blockers: full Android binary vault/playlist section shapes may not round-trip with Core JSON BK sections; **LocalStream cast needs desktop cloud/crypt drivers (CloudFfi account operations available, but cast glue incomplete)**; local-lib folder mount extras (post-refactor).
