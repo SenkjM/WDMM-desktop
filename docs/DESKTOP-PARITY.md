@@ -106,6 +106,9 @@ Cast / DLNA locked rules (unchanged — mirrors Android):
 | `wdmm_account_list_dir` / `_mkdir` / `_rename` / `_remove` | ✓ | NetworkPage (multi-provider browse via CloudFfi) |
 | `wdmm_playlist_list` / `_create` / `_delete` / `_list_entries` / `_set_entries` | ✓ | PlaylistsPage (FFI) |
 | `wdmm_manga_*` | ✓ | MangaPage read + upsert/set_progress/delete |
+| `wdmm_track_delete_by_source` | ✓ | NativeMethods (available; v5 cutover FFI) |
+| `wdmm_library_clear_all` / `_clear_index` | ✓ | NativeMethods (available; v5 cutover FFI) |
+| `wdmm_cue_album_upsert` / `_slice_upsert` / `_slice_delete` / `_album_delete` / `_remaining_slices` | ✓ | NativeMethods (available; v5 cutover FFI; corrected ABI signatures in 42d0a90) |
 
 ---
 
