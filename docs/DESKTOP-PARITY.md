@@ -12,7 +12,7 @@
 | Music  |         Content Frame                   |
 | Playlist|        (real page per destination)     |
 | Manga  |                                         |
-| Network|                                         |
+| File source|                                    |
 | Tasks  |                                         |
 | Cast   |                                         |
 | About  |                                         |
@@ -37,14 +37,14 @@ Chrome rules are unchanged from the shell demo:
 
 | Destination | Status | Notes |
 |-------------|--------|-------|
-| **Folders** | partial | Local directory browser (path bar, Up, double-click, empty/error states, source toggle). Remote WebDAV: BLOCKED — `wdmm_webdav_list` not exported in wdmm-core @ d8b2217. Shows InfoBar with clear message; no C# WebDAV client invented. |
+| **Folders** | partial | Local directory browser. Remote WebDAV browse lives on **File source** page (`wdmm_webdav_*`), not Folders. |
 | **Music** | **real** | Track list from `wdmm_track_list()`. AutoSuggestBox search via `wdmm_track_search()`. Cast button hands off track to CastPage via `AppState.PendingCastTrack`. |
 | **Playlists** | **OpenAPI bridge** | `GET/POST/DELETE /v1/playlists` + `GET /v1/playlists/:id/entries` via HttpClient when server running. InfoBar guard when OpenAPI down. Direct FFI `wdmm_playlist_list` not exported @ d8b2217. |
 | **Manga** | stub | BLOCKED — `wdmm_manga_list` / chapter APIs not in FFI or OpenAPI @ d8b2217 (storage tables `manga_series`/`manga_chapters` exist; no CRUD yet). Rich library-shaped page with always-open InfoBar naming missing APIs. |
 | **File source (Network)** | **real** | Directory browse via `wdmm_webdav_list/mkdir/rename/remove`; sources via `wdmm_account_*`; remember-path settings FFI; Settings sync uses selected source + `wdmm_sync_trigger`. i18n zh/en via Loc + Resources.resw. |
 | **Tasks** | **real** | Queue list from `wdmm_queue_status_json()`. Pending count badge. Per-task cancel via `wdmm_queue_cancel`. |
 | **Cast / DLNA** | **real** | DMR discovery via `wdmm_dlna_discover_json(2000 ms)`. USN-keyed compat prefs persisted to `%LOCALAPPDATA%\Wdmm\dmr_prefs.json`. Proxy-only cast enforced. Single-file mutex (HLS tokens via `ProxyUnregisterHls`, file tokens via `ProxyUnregister`). HLS: **unlocked** — `ProxyRegisterHls(device_id: Usn, filePath)` (wdmm-core e236ece). LocalFile→register_file or register_hls. LocalStream hook prepared — refuses until cloud/crypt drivers exist. NetworkDirect refuses (cache first). No silent HLS↔direct fallback. `ContentDeliveryKind` model wired. |
-| **Settings** | **real** | `wdmm_openapi_start`, `wdmm_token_get`, `wdmm_token_rotate`. Bind Mode + Port + Token display. |
+| **Settings** | **real** | Sync & backup: pick 源 + remote path + `wdmm_sync_trigger`. OpenAPI start/stop/token. Locale via Loc/`app_locale`. File-source remember-path settings FFI. |
 | **About** | **real** | `wdmm_version()`, OpenAPI running status + port, parity matrix summary. |
 
 ---
@@ -92,17 +92,17 @@ Cast / DLNA locked rules (unchanged — mirrors Android):
 | `wdmm_proxy_start` / `_stop` / `_port` | ✓ | CastPage |
 | `wdmm_proxy_register_file` | ✓ | CastPage (ForceDirect=true) |
 | `wdmm_proxy_unregister` | ✓ | CastPage (single-file mutex, file tokens) |
-| `wdmm_sync_trigger` | ✓ | NetworkPage |
+| `wdmm_sync_trigger` | ✓ | SettingsDialog Sync & backup |
 | `wdmm_proxy_register_hls` | ✓ | CastPage (ForceDirect=false, HLS transcode) |
 | `wdmm_proxy_unregister_hls` | ✓ | CastPage (single-file mutex, HLS tokens) |
 | `wdmm_proxy_hls_seek` | ✓ | NativeMethods (wrapper present; cast UI may not call yet) |
 | `wdmm_proxy_stream_alloc_buf` / `_free_buf` | ✓ | NativeMethods (bindings present) |
 | `wdmm_proxy_register_stream` | ✓ | NativeMethods (binding + wrapper present; CastPage hook prepared — no stream source yet) |
 | `wdmm_proxy_renew_stream_callback` | ✓ | NativeMethods (binding + wrapper present) |
-| `wdmm_webdav_list` | **TODO** | FoldersPage remote browse |
+| `wdmm_webdav_list` / `_mkdir` / `_rename` / `_remove` | ✓ | NetworkPage (File source) |
+| `wdmm_account_list` / `_get` / `_upsert` / `_delete` | ✓ | AccountStore → NetworkPage + Settings sync picker |
 | `wdmm_playlist_list` / `_save` | **TODO** | PlaylistsPage (currently: OpenAPI bridge) |
-| `wdmm_manga_list` / `_chapters` | **TODO** | MangaPage |
-| `wdmm_account_list` / `_save` | **TODO** | NetworkPage (currently: local JSON) |
+| `wdmm_manga_*` | check submodule | MangaPage (Wave D on Core; Desktop cutover separate) |
 
 ---
 
@@ -139,7 +139,7 @@ Files written to `%LOCALAPPDATA%\Wdmm\`:
 | File | Contents | Replace with FFI when |
 |---|---|---|
 | `library.db` | SQLite library (managed by Rust) | already FFI |
-| `accounts.json` | WebDAV account list | `wdmm_account_list` / `_save` exported |
+| ~~`accounts.json`~~ | sources now in Core DB | `wdmm_account_*` via AccountStore |
 | `dmr_prefs.json` | Per-USN DMR compat prefs | `wdmm_dmr_pref_*` exported |
 
 ---
@@ -195,7 +195,7 @@ dotnet build -c Debug
 | `WdmmDesktop/Pages/MusicPage.xaml/.cs` | Track list + search (real FFI); Cast button |
 | `WdmmDesktop/Pages/PlaylistsPage.xaml/.cs` | **UPDATED** — full OpenAPI bridge; two-pane list+entries; create/delete dialogs |
 | `WdmmDesktop/Pages/MangaPage.xaml/.cs` | **UPDATED** — rich library-shaped stub; always-open blocked InfoBar |
-| `WdmmDesktop/Pages/NetworkPage.xaml/.cs` | WebDAV account form; Sync Now (real FFI) |
+| `WdmmDesktop/Pages/NetworkPage.xaml/.cs` | File source directory browser (`wdmm_webdav_*` + `wdmm_account_*`); Loc i18n |
 | `WdmmDesktop/Pages/TasksPage.xaml/.cs` | Queue list + cancel (real FFI) |
 | `WdmmDesktop/Pages/CastPage.xaml/.cs` | DLNA discovery + proxy cast; locked rules enforced |
 | `WdmmDesktop/Pages/AboutPage.xaml/.cs` | **UPDATED** — parity matrix reflects Folders/Playlists/Manga + HLS deferred |
@@ -218,9 +218,7 @@ dotnet build -c Debug
 | Blocker | Unblocked by |
 |---|---|
 | Playlists direct FFI (`wdmm_playlist_list`) | wdmm-core exports FFI; replace OpenAPI bridge |
-| Folders remote WebDAV (`wdmm_webdav_list`) | wdmm-core exports FFI |
 | Manga library (`wdmm_manga_list` / `_chapters`) | wdmm-core adds CRUD + FFI export |
-| Network account CRUD (`wdmm_account_*`) | wdmm-core exports FFI; replace local JSON |
 | Cast HLS mode (`wdmm_proxy_register_hls`) | **DONE** — wired in P0.5 (wdmm-core e236ece) |
 | LocalStream cast (`wdmm_proxy_register_stream`) | Bindings + hook present; needs desktop cloud/crypt driver |
 | Sidebar animation | Polish (DoubleAnimation on SidebarColumn.Width) — not parity-blocking |

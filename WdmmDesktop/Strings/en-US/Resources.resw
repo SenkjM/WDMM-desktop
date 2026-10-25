@@ -2,13 +2,30 @@
 <root>
   <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
   <resheader name="version"><value>2.0</value></resheader>
+  <data name="Nav.Folders" xml:space="preserve"><value>Folders</value></data>
+  <data name="Nav.Music" xml:space="preserve"><value>Music</value></data>
+  <data name="Nav.Playlists" xml:space="preserve"><value>Playlists</value></data>
+  <data name="Nav.Manga" xml:space="preserve"><value>Manga</value></data>
   <data name="Nav.Network" xml:space="preserve"><value>File source</value></data>
+  <data name="Nav.Tasks" xml:space="preserve"><value>Tasks</value></data>
+  <data name="Nav.About" xml:space="preserve"><value>About</value></data>
+  <data name="Nav.Settings" xml:space="preserve"><value>Settings</value></data>
   <data name="Network.Sources" xml:space="preserve"><value>Source</value></data>
   <data name="Network.ManageSources" xml:space="preserve"><value>Manage sources…</value></data>
   <data name="Network.Up" xml:space="preserve"><value>Up</value></data>
   <data name="Network.Refresh" xml:space="preserve"><value>Refresh</value></data>
   <data name="Network.NewFolder" xml:space="preserve"><value>New folder</value></data>
+  <data name="Network.Empty" xml:space="preserve"><value>No items in this folder</value></data>
+  <data name="Network.NoSources" xml:space="preserve"><value>Add a source to browse</value></data>
+  <data name="Network.Retry" xml:space="preserve"><value>Retry</value></data>
+  <data name="Network.ColName" xml:space="preserve"><value>Name</value></data>
+  <data name="Network.ColSize" xml:space="preserve"><value>Size</value></data>
+  <data name="Network.Rename" xml:space="preserve"><value>Rename</value></data>
+  <data name="Network.Delete" xml:space="preserve"><value>Delete</value></data>
   <data name="Settings.FileSource" xml:space="preserve"><value>File source</value></data>
-  <data name="Settings.SyncBackup" xml:space="preserve"><value>Sync &amp; backup</value></data>
+  <data name="Settings.SyncBackup" xml:space="preserve"><value>Sync & backup</value></data>
+  <data name="Settings.SyncPickSource" xml:space="preserve"><value>Source</value></data>
+  <data name="Settings.SyncRemotePath" xml:space="preserve"><value>Remote path</value></data>
   <data name="Settings.SyncNow" xml:space="preserve"><value>Sync now</value></data>
+  <data name="Settings.Language" xml:space="preserve"><value>Language</value></data>
 </root>

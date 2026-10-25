@@ -5,6 +5,7 @@ using System.Text.Json;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using WdmmDesktop.Generated;
+using WdmmDesktop.Services;
 
 namespace WdmmDesktop.Dialogs
 {
@@ -36,6 +37,7 @@ namespace WdmmDesktop.Dialogs
             LoadFfiKvSettings();
             LoadAccounts();
             PopulateSyncSources();
+            ApplySyncLoc();
         }
 
         // ── Section switching ──────────────────────────────────────────────────
@@ -98,10 +100,8 @@ namespace WdmmDesktop.Dialogs
             // Theme
             SelectComboByTag(ThemeCombo, _prefs.Theme);
 
-            // Sync fields
+            // Sync fields (credentials come from selected source via AccountStore)
             SyncRemoteDirBox.Text = _prefs.SyncRemoteDir ?? "";
-            SyncUrlBox.Text        = _prefs.SyncUrl ?? "";
-            SyncUserBox.Text       = _prefs.SyncUser ?? "";
 
             // OpenAPI port / bind mode
             PortBox.Text      = _prefs.OpenApiPort.ToString();
@@ -192,6 +192,13 @@ namespace WdmmDesktop.Dialogs
 
         // ── Section 6: 同步与备份 ─────────────────────────────────────────────────
 
+
+        private void ApplySyncLoc()
+        {
+            if (NavSync != null) NavSync.Content = Loc.Get("Settings.SyncBackup");
+            if (TriggerSyncBtn != null) TriggerSyncBtn.Content = Loc.Get("Settings.SyncNow");
+        }
+
         private void TriggerSyncBtn_Click(object sender, RoutedEventArgs e)
         {
             var acc = SyncSourceCombo?.SelectedItem as WebDavAccount;
@@ -199,6 +206,8 @@ namespace WdmmDesktop.Dialogs
             var user = acc?.Username ?? "";
             var pass = acc?.Password ?? "";
             var dir = string.IsNullOrWhiteSpace(SyncRemoteDirBox?.Text) ? "/wdmm-sync" : SyncRemoteDirBox.Text.Trim();
+            _prefs.SyncRemoteDir = dir;
+            LocalStore.Save(PrefsFile, _prefs);
             if (string.IsNullOrEmpty(url))
             {
                 ShowInlineStatus(SyncStatusText, "请先在文件源中添加源", isError: true);
