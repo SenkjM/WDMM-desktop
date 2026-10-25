@@ -214,7 +214,7 @@ namespace WdmmDesktop.Pages
                 var created = await CreatePlaylistAsync(name, port, token);
                 PlaylistList.Items.Add(created);
                 PlaylistList.SelectedItem = created;
-                StatusBar.Text = $"Created "{created.Name}".";
+                StatusBar.Text = $"Created \"{created.Name}\"";
             }
             catch (Exception ex)
             {
@@ -232,7 +232,7 @@ namespace WdmmDesktop.Pages
             var dlg = new ContentDialog
             {
                 Title             = "Delete Playlist",
-                Content           = $"Delete "{pl?.Name ?? _selectedPlaylistId}"? This cannot be undone.",
+                Content           = $"Delete \"{pl?.Name ?? _selectedPlaylistId}\"? This cannot be undone.",
                 PrimaryButtonText = "Delete",
                 CloseButtonText   = "Cancel",
                 XamlRoot          = XamlRoot

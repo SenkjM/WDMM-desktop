@@ -3,12 +3,12 @@ name: Testbuild
 # Portable zip testbuild for WDMM Desktop (WinUI 3 / Windows App SDK, unpackaged).
 # No tags, no GitHub Release, no MSIX, no MSI — portable zip only.
 #
-# Artifact chain: dispatch SenkjM/WDMM-core → native-artifacts (feat/proxy-hls-ffmpeg)
-# FIRST to produce wdmm-ffi-windows-x64 for the Core SHA pinned as a submodule here.
-# Then dispatch this workflow; it downloads the matching DLL and publishes a
-# self-contained win-x64 portable folder → zip.
+# FFI: wdmm_ffi.dll is built from the git submodule rust/wdmm-core on this
+# runner (Rust stable / x86_64-pc-windows-msvc + fetch-ffmpeg-vendor + cargo).
+# No cross-repo artifact download — Core native-artifacts.yml is box-only
+# convenience and is NOT consumed here.  No release pipeline.
 #
-# Version: 0.0.0-testbuild.<run_number> (no semver tag required).
+# Version: 0.0.0-testbuild.<run_number>-<sha7> (no semver tag required).
 # Zip name: WDMM-desktop-0.0.0-testbuild.<run>-<sha7>-win-x64.zip
 
 on:
@@ -26,83 +26,36 @@ jobs:
   windows:
     name: Build portable win-x64 zip
     runs-on: windows-latest
-    env:
-      # Cross-repo artifact download: WDMM_CORE_READ_TOKEN is a PAT with
-      # actions:read on SenkjM/WDMM-core. Falls back to GITHUB_TOKEN when
-      # both repos share visibility (same user/org).
-      GH_TOKEN: ${{ secrets.WDMM_CORE_READ_TOKEN || secrets.GITHUB_TOKEN }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           submodules: recursive
 
-      - name: Read Core submodule SHA
-        shell: bash
-        run: |
-          CORE_SHA="$(git -C rust/wdmm-core rev-parse HEAD)"
-          echo "CORE_SHA=$CORE_SHA" >> "$GITHUB_ENV"
-          echo "Core submodule SHA: $CORE_SHA"
+      # ── Build Rust FFI from the git submodule (no cross-repo download) ────
+      - name: Setup Rust stable (x86_64-pc-windows-msvc)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
 
-      # Scans the last 20 successful runs of native-artifacts on
-      # feat/proxy-hls-ffmpeg in SenkjM/WDMM-core; downloads the first run
-      # whose COMMIT.txt matches the submodule SHA exactly.
-      # Fails clearly if none found — do NOT fall back silently.
-      - name: Download wdmm_ffi.dll from Core CI
+      - name: Fetch FFmpeg vendor (windows-x86_64 only)
+        shell: bash
+        env:
+          WDMM_FFMPEG_ONLY: windows-x86_64
+        run: bash rust/wdmm-core/scripts/fetch-ffmpeg-vendor.sh
+
+      - name: Build wdmm-ffi (release, windows-msvc)
         shell: bash
         run: |
           set -euo pipefail
-          echo "Scanning Core native-artifacts runs for SHA: $CORE_SHA"
-
-          DLL_STAGING="$RUNNER_TEMP/wdmm-ffi-win"
-          mkdir -p "$DLL_STAGING"
-
-          MATCHED_RUN=""
-          while IFS= read -r run_id; do
-            TMPDIR_ART="$(mktemp -d)"
-            if gh run download "$run_id" \
-                --repo SenkjM/WDMM-core \
-                -n wdmm-ffi-windows-x64 \
-                -D "$TMPDIR_ART" 2>/dev/null; then
-              COMMIT_FILE="$TMPDIR_ART/COMMIT.txt"
-              if [ -f "$COMMIT_FILE" ]; then
-                ART_SHA="$(tr -d '[:space:]' < "$COMMIT_FILE")"
-                if [ "$ART_SHA" = "$CORE_SHA" ]; then
-                  cp "$TMPDIR_ART/wdmm_ffi.dll" "$DLL_STAGING/wdmm_ffi.dll"
-                  MATCHED_RUN="$run_id"
-                  rm -rf "$TMPDIR_ART"
-                  break
-                fi
-              fi
-            fi
-            rm -rf "$TMPDIR_ART"
-          done < <(gh run list \
-            --repo SenkjM/WDMM-core \
-            --workflow native-artifacts.yml \
-            --branch feat/proxy-hls-ffmpeg \
-            --status success \
-            --limit 20 \
-            --json databaseId \
-            --jq '.[].databaseId')
-
-          if [ -z "$MATCHED_RUN" ]; then
-            echo "::error::No successful native-artifacts run found for Core SHA ${CORE_SHA}."
-            echo "::error::Dispatch SenkjM/WDMM-core → native-artifacts on feat/proxy-hls-ffmpeg at that commit first."
+          cd rust/wdmm-core
+          cargo build --release -p wdmm-ffi
+          DLL="target/release/wdmm_ffi.dll"
+          if [ ! -f "$DLL" ]; then
+            echo "::error::wdmm_ffi.dll not found at $DLL after cargo build."
             exit 1
           fi
-          echo "DLL_STAGING=$DLL_STAGING" >> "$GITHUB_ENV"
-          echo "wdmm_ffi.dll ready (run $MATCHED_RUN, Core SHA $CORE_SHA)"
-
-      # Place DLL where the csproj CopyRustDll MSBuild target expects it
-      # ($(SolutionDir)rust\wdmm-core\target\release\wdmm_ffi.dll) so that
-      # an optional post-build copy into OutDir also works.
-      - name: Place DLL at expected Rust output path
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p rust/wdmm-core/target/release
-          cp "$DLL_STAGING/wdmm_ffi.dll" rust/wdmm-core/target/release/wdmm_ffi.dll
-          echo "DLL placed at rust/wdmm-core/target/release/wdmm_ffi.dll"
+          echo "wdmm_ffi.dll ready at rust/wdmm-core/$DLL"
 
       - name: Setup .NET 8
         uses: actions/setup-dotnet@v4
@@ -176,11 +129,11 @@ jobs:
           echo "wdmm_ffi.dll copied to publish/win-x64/"
 
       # Stage the portable layout:
-      #   WDMM.cmd            outer launcher (relative paths)
+      #   WDMM.lnk            outer launcher — relative target bin\WdmmDesktop.exe
       #   PORTABLE-README.txt layout + DLL placement docs
       #   bin/                MSI-payload-shaped tree copied from publish/win-x64
       #     WdmmDesktop.exe   entry point + all published DLLs/assets at root
-      #     lib/wdmm_ffi.dll   Rust FFI bridge (moved off the root)
+      #     lib/wdmm_ffi.dll  Rust FFI bridge (moved off the root)
       #
       # All .NET/WinAppSDK DLLs stay beside the exe (deps.json references them
       # by path relative to bin/); only wdmm_ffi.dll moves to bin/lib/ because
@@ -209,26 +162,18 @@ jobs:
             echo "::warning::wdmm_ffi.dll not found in publish output; bin/lib/ will be empty"
           fi
 
-          # Outer launcher (relative .cmd; no absolute paths survive in the zip).
-          # Future MSI installs the same bin/ payload and uses its own shortcut,
-          # so this launcher is portable-zip-only.
-          # Heredoc bodies must stay indented in YAML (bare "@echo" breaks parse).
-          # Write files with printf so content has no leading spaces.
-          printf '%s\n' \
-            '@echo off' \
-            'rem WDMM Desktop portable launcher.' \
-            'rem Starts WdmmDesktop.exe from bin\ relative to this script.' \
-            'rem Do not move this file independently of the bin\ folder.' \
-            'start "" "%~dp0bin\WdmmDesktop.exe" %*' \
-            > "$STAGE/WDMM.cmd"
+          # PORTABLE-README.txt — documents WDMM.lnk as the entry point.
+          # Heredoc bodies must stay indented in YAML; write via printf so no
+          # leading spaces land in the file.
           printf '%s\n' \
             'WDMM Desktop - Portable Testbuild' \
             '==================================' \
             '' \
             'Layout' \
             '------' \
-            '  WDMM.cmd                   Relative launcher (recommended entry point).' \
-            '                             Uses %~dp0 so the zip can be extracted anywhere.' \
+            '  WDMM.lnk                   Shortcut launcher (recommended entry point).' \
+            '                             Relative target: bin\WdmmDesktop.exe.' \
+            '                             The zip can be extracted anywhere.' \
             '  PORTABLE-README.txt        This file.' \
             '  bin\                       MSI-payload-shaped tree.' \
             '    WdmmDesktop.exe          Application entry point.' \
@@ -262,15 +207,34 @@ jobs:
             'Future MSI note' \
             '---------------' \
             'A future MSI/WiX installer will install the same bin\ directory tree as-is.' \
-            'The portable WDMM.cmd launcher is not needed in the installed layout;' \
+            'The portable WDMM.lnk launcher is not needed in the installed layout;' \
             'the MSI shortcut targets WdmmDesktop.exe directly.' \
             > "$STAGE/PORTABLE-README.txt"
           echo "FOLDER_NAME=$FOLDER_NAME" >> "$GITHUB_ENV"
           echo "Portable layout staged at: $STAGE"
-          echo "  WDMM.cmd            : $([ -f "$STAGE/WDMM.cmd"             ] && echo OK || echo MISSING)"
           echo "  PORTABLE-README.txt : $([ -f "$STAGE/PORTABLE-README.txt"  ] && echo OK || echo MISSING)"
           echo "  bin/WdmmDesktop.exe : $([ -f "$STAGE/bin/WdmmDesktop.exe"  ] && echo OK || echo MISSING)"
           echo "  bin/lib/wdmm_ffi.dll: $([ -f "$STAGE/bin/lib/wdmm_ffi.dll" ] && echo OK || echo MISSING)"
+
+      # Create WDMM.lnk with a relative target (bin\WdmmDesktop.exe) using the
+      # WScript.Shell COM object.  TargetPath is set to the relative string
+      # directly — no Resolve-Path — so the link survives zip extraction to any
+      # directory.  WorkingDirectory is set to "bin" so the exe starts in its
+      # own directory where deps.json and peer DLLs live.
+      - name: Create WDMM.lnk (relative target)
+        shell: pwsh
+        run: |
+          $stage = "staging/$env:FOLDER_NAME"
+          $shell = New-Object -ComObject WScript.Shell
+          $lnkPath = [IO.Path]::GetFullPath("$stage\WDMM.lnk")
+          $lnk = $shell.CreateShortcut($lnkPath)
+          $lnk.TargetPath      = 'bin\WdmmDesktop.exe'
+          $lnk.WorkingDirectory = 'bin'
+          $lnk.Description     = 'WDMM Desktop'
+          $lnk.Save()
+          $ok = Test-Path $lnkPath
+          Write-Host "WDMM.lnk created: $ok  target=bin\WdmmDesktop.exe"
+          if (-not $ok) { exit 1 }
 
       - name: Zip portable folder
         shell: pwsh

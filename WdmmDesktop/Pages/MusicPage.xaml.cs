@@ -72,7 +72,7 @@ namespace WdmmDesktop.Pages
                 EmptyState.Visibility = Visibility.Visible;
                 EmptyText.Text = string.IsNullOrWhiteSpace(query)
                     ? "No tracks in library. Sync from Network page to populate."
-                    : $"No results for "{query}".";
+                    : $"No results for \"{query}\"";
                 StatusBar.Text = "";
             }
             else
@@ -82,7 +82,7 @@ namespace WdmmDesktop.Pages
                     TrackList.Items.Add(t);
                 StatusBar.Text = $"{tracks.Count} track{(tracks.Count == 1 ? "" : "s")}";
                 if (!string.IsNullOrWhiteSpace(query))
-                    StatusBar.Text += $" matching "{query}"";
+                    StatusBar.Text += $" matching \"{query}\"";
             }
         }
 
