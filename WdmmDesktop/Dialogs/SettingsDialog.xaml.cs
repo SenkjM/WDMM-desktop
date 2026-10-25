@@ -462,6 +462,8 @@ namespace WdmmDesktop.Dialogs
         {
             // Guard against re-entrancy from the initial load assignment.
             if (_queueConcurrencyChanging) return;
+            // ValueChanged can fire while XAML still wiring later named controls.
+            if (QueueConcurrencyStatusText is null) return;
             if (double.IsNaN(args.NewValue)) return;
 
             var n = (int)Math.Clamp(args.NewValue, 1, 8);
