@@ -919,5 +919,138 @@ namespace WdmmDesktop.Generated
         /// <summary>Atomically replace all items in a folder. jsonArray is a JSON array of item objects.</summary>
         public static string UserFolderSetItems(string folderId, string jsonArray)
             => WithNativeString2(folderId, jsonArray, wdmm_user_folder_set_items);
+
+        // ── Manga (Wave D — fdb05df) ──────────────────────────────────────────
+        // Requires wdmm_library_init first. All FfiString returns must be freed.
+
+        /// <summary>List all mangas as a JSON array. Returns "error:…" on failure.</summary>
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern FfiString wdmm_manga_list();
+
+        /// <summary>Get a single manga by id. Returns manga JSON, "null", or "error:…".</summary>
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern FfiString wdmm_manga_get(IntPtr id);
+
+        /// <summary>Upsert a manga from a JSON object string. Returns "ok" or "error:…".</summary>
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern FfiString wdmm_manga_upsert(IntPtr json);
+
+        /// <summary>Delete a manga by id (cascades to pages + progress). Returns "ok", "not_found", or "error:…".</summary>
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern FfiString wdmm_manga_delete(IntPtr id);
+
+        /// <summary>List all pages for a manga as a JSON array. Returns "error:…" on failure.</summary>
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern FfiString wdmm_manga_list_pages(IntPtr mangaId);
+
+        /// <summary>
+        /// Atomically replace all pages for a manga.
+        /// jsonArray: JSON array of {"manga_id","page_index","rel_path"} objects.
+        /// Returns "ok" or "error:…".
+        /// </summary>
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern FfiString wdmm_manga_set_pages(IntPtr mangaId, IntPtr jsonArray);
+
+        /// <summary>Get reading progress for a manga. Returns progress JSON, "null", or "error:…".</summary>
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern FfiString wdmm_manga_get_progress(IntPtr mangaId);
+
+        /// <summary>
+        /// Set (upsert) reading progress. pageIndex is the 0-based current page.
+        /// Returns "ok" or "error:…".
+        /// </summary>
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern FfiString wdmm_manga_set_progress(IntPtr mangaId, long pageIndex);
+
+        /// <summary>List reading progress for all mangas as a JSON array. Returns "error:…" on failure.</summary>
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern FfiString wdmm_manga_list_progress();
+
+        /// <summary>
+        /// List distinct series tags as a JSON array of {"id","title"} objects.
+        /// Returns "error:…" on failure.
+        /// </summary>
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern FfiString wdmm_manga_list_series();
+
+        // ── Queue concurrency (Wave D — fdb05df) ──────────────────────────────
+
+        /// <summary>Return the current queue concurrency limit (1–8).</summary>
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern int wdmm_queue_get_concurrency();
+
+        /// <summary>
+        /// Set the queue concurrency limit. n is clamped to 1..=8.
+        /// Returns "ok". Caller must free the result.
+        /// </summary>
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern FfiString wdmm_queue_set_concurrency(int n);
+
+        // ── Manga convenience wrappers ────────────────────────────────────────
+
+        /// <summary>List all mangas as a JSON array string.</summary>
+        public static string MangaList()
+            => wdmm_manga_list().ToStringAndFree();
+
+        /// <summary>Get a manga by id. Returns manga JSON, "null", or "error:…".</summary>
+        public static string MangaGet(string id)
+            => WithNativeString(id, wdmm_manga_get);
+
+        /// <summary>Upsert a manga from a JSON string. Returns "ok" or "error:…".</summary>
+        public static string MangaUpsert(string json)
+            => WithNativeString(json, wdmm_manga_upsert);
+
+        /// <summary>Delete a manga by id. Returns "ok", "not_found", or "error:…".</summary>
+        public static string MangaDelete(string id)
+            => WithNativeString(id, wdmm_manga_delete);
+
+        /// <summary>List pages for a manga. Returns JSON array or "error:…".</summary>
+        public static string MangaListPages(string mangaId)
+            => WithNativeString(mangaId, wdmm_manga_list_pages);
+
+        /// <summary>Atomically replace all pages. jsonArray is a JSON array of page objects.</summary>
+        public static string MangaSetPages(string mangaId, string jsonArray)
+            => WithNativeString2(mangaId, jsonArray, wdmm_manga_set_pages);
+
+        /// <summary>Get reading progress for a manga. Returns progress JSON, "null", or "error:…".</summary>
+        public static string MangaGetProgress(string mangaId)
+            => WithNativeString(mangaId, wdmm_manga_get_progress);
+
+        /// <summary>Set reading progress (0-based page index). Returns "ok" or "error:…".</summary>
+        public static string MangaSetProgress(string mangaId, long pageIndex)
+        {
+            var bytes = System.Text.Encoding.UTF8.GetBytes(mangaId + '\0');
+            var ptr   = Marshal.AllocHGlobal(bytes.Length);
+            try
+            {
+                Marshal.Copy(bytes, 0, ptr, bytes.Length);
+                return wdmm_manga_set_progress(ptr, pageIndex).ToStringAndFree();
+            }
+            finally { Marshal.FreeHGlobal(ptr); }
+        }
+
+        /// <summary>List reading progress for all mangas as a JSON array.</summary>
+        public static string MangaListProgress()
+            => wdmm_manga_list_progress().ToStringAndFree();
+
+        /// <summary>List distinct series tags as a JSON array of {"id","title"} objects.</summary>
+        public static string MangaListSeries()
+            => wdmm_manga_list_series().ToStringAndFree();
+
+        // ── Queue concurrency convenience wrappers ────────────────────────────
+
+        /// <summary>Return the current queue concurrency limit (1–8).</summary>
+        public static int QueueGetConcurrency()
+        {
+            try { return wdmm_queue_get_concurrency(); }
+            catch { return 1; }
+        }
+
+        /// <summary>Set the queue concurrency limit (clamped 1–8). Returns "ok" or "error:…".</summary>
+        public static string QueueSetConcurrency(int n)
+        {
+            try { return wdmm_queue_set_concurrency(n).ToStringAndFree(); }
+            catch (Exception ex) { return $"error:{ex.Message}"; }
+        }
     }
 }

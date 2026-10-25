@@ -38,7 +38,7 @@ namespace WdmmDesktop.Pages
             // Parity matrix — honest done / in progress / blocked.
             // Keep in sync with docs/DESKTOP-PARITY.md. Never mark stubs as real.
             ParityText.Text =
-                "Wave C (2026-10-25) — Android parity closeout\n\n"                       +
+                "Wave D (2026-10-25) — Manga FFI wire + queue concurrency\n\n"              +
                 "Folders    done   — mount UX: add/remove/reorder track/album/artist\n"   +
                 "              wdmm_user_folder_add_item / remove_item / set_items FFI\n" +
                 "Playlists  done   — set_entries edit UI: add/remove/reorder + FFI\n"     +
@@ -46,11 +46,12 @@ namespace WdmmDesktop.Pages
                 "Cast       done   — CastDialog only; CastPage removed Wave C\n"          +
                 "              DLNA→proxy, single-file mutex, USN prefs\n"                +
                 "Settings   done   — 7 sections; all KV-backed controls live Wave C\n"    +
-                "              RememberNetworkPath + last path via Core settings FFI\n"   +
-                "              Library/Misc/Network2/VideoFile/DLNA all KV-backed\n"      +
+                "              Queue concurrency slider live Wave D (Core fdb05df)\n"     +
                 "Tasks      done   — wdmm_queue_status_json / cancel (FFI)\n"             +
                 "Network    part   — account CRUD + sync; last-path session memory\n"     +
-                "Manga      blocked— no manga FFI (wdmm_manga_* not exported)\n"          +
+                "Manga      part   — wdmm_manga_list + progress (FFI, Wave D)\n"          +
+                "              list + detail stub (wdmm_manga_get / list_pages)\n"        +
+                "              upsert/delete UI deferred to Wave E\n"                     +
                 "OpenAPI    opt-in — third-party only (Settings → 第三方/开发者)\n"      +
                 "Local-lib  n/a    — post-Rust-refactor feature; out of scope";
         }

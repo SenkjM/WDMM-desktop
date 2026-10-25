@@ -155,9 +155,17 @@
 
                         <StackPanel Spacing="6">
                             <TextBlock Text="下载队列设置" FontSize="12" FontWeight="SemiBold" />
-                            <TextBox IsEnabled="False" PlaceholderText="最大并发数（待 FFI）" />
-                            <TextBlock Style="{StaticResource HintTextStyle}"
-                                       Text="待 FFI：wdmm_queue_set_concurrency 未导出，此项保持禁用。" />
+                            <StackPanel Spacing="4">
+                                <TextBlock Text="最大并发数" FontSize="12" />
+                                <NumberBox x:Name="QueueConcurrencyBox"
+                                           Minimum="1" Maximum="8" Value="1"
+                                           SpinButtonPlacementMode="Compact"
+                                           SmallChange="1" LargeChange="1"
+                                           ValueChanged="QueueConcurrencyBox_ValueChanged" />
+                            </StackPanel>
+                            <TextBlock x:Name="QueueConcurrencyStatusText"
+                                       Style="{StaticResource HintTextStyle}"
+                                       Text="通过 wdmm_queue_get/set_concurrency（Core Wave D）设置；范围 1–8。" />
                         </StackPanel>
 
                         <StackPanel Spacing="10">

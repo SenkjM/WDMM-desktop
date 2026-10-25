@@ -438,8 +438,41 @@ namespace WdmmDesktop.Dialogs
                 var locale = KvString("app_locale");
                 if (!string.IsNullOrEmpty(locale)) SelectComboByTag(LocaleCombo, locale);
                 SnackDurationBox.Value = KvInt("snack_duration", defaultVal: 3);
+
+                // ── Queue concurrency (Wave D) ─────────────────────────────
+                // Guard so setting the initial value doesn't fire the save handler.
+                _queueConcurrencyChanging = true;
+                try   { QueueConcurrencyBox.Value = NativeMethods.QueueGetConcurrency(); }
+                finally { _queueConcurrencyChanging = false; }
             }
             catch { /* FFI not loaded; controls keep XAML defaults */ }
+        }
+
+        // ── Queue concurrency (Wave D — wdmm_queue_get/set_concurrency) ───────
+
+        private bool _queueConcurrencyChanging;
+
+        private void QueueConcurrencyBox_ValueChanged(
+            NumberBox sender, NumberBoxValueChangedEventArgs args)
+        {
+            // Guard against re-entrancy from the initial load assignment.
+            if (_queueConcurrencyChanging) return;
+            if (double.IsNaN(args.NewValue)) return;
+
+            var n = (int)Math.Clamp(args.NewValue, 1, 8);
+            _queueConcurrencyChanging = true;
+            try
+            {
+                var result = NativeMethods.QueueSetConcurrency(n);
+                QueueConcurrencyStatusText.Text = result.StartsWith("error:", StringComparison.Ordinal)
+                    ? result
+                    : $"并发数已设为 {n}。";
+            }
+            catch (Exception ex)
+            {
+                QueueConcurrencyStatusText.Text = $"FFI 不可用：{ex.Message}";
+            }
+            finally { _queueConcurrencyChanging = false; }
         }
 
         private static bool KvBool(string key, bool defaultVal)
