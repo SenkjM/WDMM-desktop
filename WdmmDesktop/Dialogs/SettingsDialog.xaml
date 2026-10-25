@@ -23,346 +23,283 @@
             <Setter Property="Opacity"   Value="0.55" />
             <Setter Property="TextWrapping" Value="Wrap" />
         </Style>
-        <Style x:Key="StubRowStyle" TargetType="StackPanel">
-            <Setter Property="Spacing" Value="4" />
-        </Style>
     </ContentDialog.Resources>
 
     <Border Background="{StaticResource DialogAcrylicBrush}"
-            CornerRadius="8"
+            CornerRadius="12"
+            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+            BorderThickness="1"
             Padding="0">
-        <Grid Width="680" Height="480">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="168" />
-                <ColumnDefinition Width="*" />
-            </Grid.ColumnDefinitions>
+        <Grid Width="920" Height="640">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
 
-            <!-- Left nav list -->
-            <Border Grid.Column="0"
-                    BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
-                    BorderThickness="0,0,1,0">
-                <StackPanel Margin="6,8,6,8" Spacing="2">
-                    <!-- FFI version strip at top -->
-                    <TextBlock x:Name="FfiVersionText"
-                               FontSize="11"
-                               Opacity="0.5"
-                               TextTrimming="CharacterEllipsis"
-                               Margin="8,2,8,10" />
+            <TextBlock x:Name="FfiVersionText"
+                       Grid.Row="0"
+                       FontSize="11"
+                       Opacity="0.5"
+                       TextTrimming="CharacterEllipsis"
+                       Margin="16,10,16,0" />
 
-                    <RadioButton x:Name="NavHome"      GroupName="SettingsNav" Tag="Home"     IsChecked="True" Checked="SettingsNav_Checked" HorizontalAlignment="Stretch" Content="主页与导航" />
-                    <RadioButton x:Name="NavLibrary"   GroupName="SettingsNav" Tag="Library"               Checked="SettingsNav_Checked" HorizontalAlignment="Stretch" Content="媒体库" />
-                    <RadioButton x:Name="NavNetwork2"  GroupName="SettingsNav" Tag="Network2"               Checked="SettingsNav_Checked" HorizontalAlignment="Stretch" Content="文件源" />
-                    <RadioButton x:Name="NavVideoFile" GroupName="SettingsNav" Tag="VideoFile"              Checked="SettingsNav_Checked" HorizontalAlignment="Stretch" Content="视频/图片/文件" />
-                    <RadioButton x:Name="NavMisc"      GroupName="SettingsNav" Tag="Misc"                  Checked="SettingsNav_Checked" HorizontalAlignment="Stretch" Content="杂项" />
-                    <RadioButton x:Name="NavSync"      GroupName="SettingsNav" Tag="Sync"                  Checked="SettingsNav_Checked" HorizontalAlignment="Stretch" Content="同步与备份" />
-                    <RadioButton x:Name="NavOpenApi"   GroupName="SettingsNav" Tag="OpenApi"               Checked="SettingsNav_Checked" HorizontalAlignment="Stretch" Content="第三方/开发者" />
-                </StackPanel>
-            </Border>
+            <TabView x:Name="SettingsTabs"
+                     Grid.Row="1"
+                     IsAddTabButtonVisible="False"
+                     CanDragTabs="False"
+                     CanReorderTabs="False"
+                     TabWidthMode="SizeToContent"
+                     SelectionChanged="SettingsTabs_SelectionChanged"
+                     Margin="4,4,4,8">
 
-            <!-- Right content area -->
-            <ScrollViewer Grid.Column="1"
-                          VerticalScrollBarVisibility="Auto"
-                          HorizontalScrollBarVisibility="Disabled"
-                          Padding="20,16,20,16">
-                <Grid>
-
-                    <!-- ── Section 1: 主页与导航 ── -->
-                    <StackPanel x:Name="PanelHome" Spacing="16" Visibility="Visible">
-                        <TextBlock Style="{StaticResource SectionHeaderStyle}" Text="主页与导航" />
-
-                        <StackPanel Spacing="6">
-                            <TextBlock Text="默认首页" FontSize="12" />
-                            <ComboBox x:Name="DefaultHomeCombo"
-                                      HorizontalAlignment="Stretch">
-                                <ComboBoxItem Content="Folders (我的文件夹)" Tag="Folders" IsSelected="True" />
-                                <ComboBoxItem Content="Music"               Tag="Music" />
-                                <ComboBoxItem Content="Playlists"           Tag="Playlists" />
-                                <ComboBoxItem Content="Manga"               Tag="Manga" />
-                                <ComboBoxItem Content="Network"             Tag="Network" />
-                                <ComboBoxItem Content="Tasks"               Tag="Tasks" />
-                            </ComboBox>
-                            <TextBlock Style="{StaticResource HintTextStyle}"
-                                       Text="应用启动时进入的页面。" />
+                <!-- 主页与导航 -->
+                <TabViewItem x:Name="TabHome" Header="主页与导航" IsSelected="True" Tag="Home">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="20,16,20,16">
+                        <StackPanel x:Name="PanelHome" Spacing="16">
+                            <TextBlock Style="{StaticResource SectionHeaderStyle}" Text="主页与导航" />
+                            <StackPanel Spacing="6">
+                                <TextBlock Text="默认首页" FontSize="12" />
+                                <ComboBox x:Name="DefaultHomeCombo" HorizontalAlignment="Stretch">
+                                    <ComboBoxItem Content="Folders (我的文件夹)" Tag="Folders" IsSelected="True" />
+                                    <ComboBoxItem Content="Music" Tag="Music" />
+                                    <ComboBoxItem Content="Playlists" Tag="Playlists" />
+                                    <ComboBoxItem Content="Manga" Tag="Manga" />
+                                    <ComboBoxItem Content="Network" Tag="Network" />
+                                    <ComboBoxItem Content="Tasks" Tag="Tasks" />
+                                </ComboBox>
+                                <TextBlock Style="{StaticResource HintTextStyle}" Text="应用启动时进入的页面。" />
+                            </StackPanel>
+                            <StackPanel Spacing="6">
+                                <ToggleSwitch x:Name="RememberNetworkPathToggle" Header="记住网络路径" MinWidth="0" />
+                                <TextBlock Style="{StaticResource HintTextStyle}"
+                                           Text="切换至文件源页时自动恢复上次浏览的路径。" />
+                            </StackPanel>
+                            <Button x:Name="SaveHomeBtn" Click="SaveHomeBtn_Click" Content="保存"
+                                    Style="{StaticResource AccentButtonStyle}" Padding="16,8" />
+                            <TextBlock x:Name="HomeStatusText" FontSize="11" Visibility="Collapsed" />
                         </StackPanel>
+                    </ScrollViewer>
+                </TabViewItem>
 
-                        <StackPanel Spacing="6">
-                            <ToggleSwitch x:Name="RememberNetworkPathToggle"
-                                          Header="记住网络路径"
-                                          MinWidth="0" />
+                <!-- 媒体库 -->
+                <TabViewItem x:Name="TabLibrary" Header="媒体库" Tag="Library">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="20,16,20,16">
+                        <StackPanel x:Name="PanelLibrary" Spacing="16">
+                            <TextBlock Style="{StaticResource SectionHeaderStyle}" Text="媒体库" />
                             <TextBlock Style="{StaticResource HintTextStyle}"
-                                       Text="切换至网络页时自动恢复上次浏览的路径（本地偏好）。" />
+                                       Text="通过 wdmm_kv_* 写入 Core（键名对齐安卓 media_scan_*）。" />
+                            <StackPanel Spacing="10">
+                                <TextBlock Text="扫描选项" FontSize="12" FontWeight="SemiBold" />
+                                <ToggleSwitch x:Name="ScanRecursiveToggle" Header="递归扫描子目录" MinWidth="0" />
+                                <StackPanel Spacing="4">
+                                    <TextBlock Text="最大扫描深度" FontSize="12" />
+                                    <NumberBox x:Name="ScanDepthBox" Minimum="1" Maximum="32" Value="1"
+                                               SpinButtonPlacementMode="Compact" />
+                                </StackPanel>
+                            </StackPanel>
+                            <StackPanel Spacing="10">
+                                <TextBlock Text="媒体类型" FontSize="12" FontWeight="SemiBold" />
+                                <ToggleSwitch x:Name="ScanAudioToggle" Header="扫描音频文件" MinWidth="0" />
+                                <ToggleSwitch x:Name="ScanVideoToggle" Header="扫描视频文件" MinWidth="0" />
+                                <ToggleSwitch x:Name="ScanMangaToggle" Header="扫描漫画/图片" MinWidth="0" />
+                            </StackPanel>
+                            <Button x:Name="SaveLibraryBtn" Click="SaveLibraryBtn_Click" Content="保存"
+                                    Style="{StaticResource AccentButtonStyle}" Padding="16,8" />
+                            <TextBlock x:Name="LibraryStatusText" FontSize="11" Visibility="Collapsed" />
                         </StackPanel>
+                    </ScrollViewer>
+                </TabViewItem>
 
-                        <Button x:Name="SaveHomeBtn"
-                                Click="SaveHomeBtn_Click"
-                                Content="保存"
-                                Style="{StaticResource AccentButtonStyle}"
-                                Padding="16,8" />
-                        <TextBlock x:Name="HomeStatusText" FontSize="11" Visibility="Collapsed" />
-                    </StackPanel>
+                <!-- 文件源 -->
+                <TabViewItem x:Name="TabNetwork2" Header="文件源" Tag="Network2">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="20,16,20,16">
+                        <StackPanel x:Name="PanelNetwork2" Spacing="16">
+                            <TextBlock Style="{StaticResource SectionHeaderStyle}" Text="文件源" />
+                            <StackPanel Spacing="6">
+                                <TextBlock Text="源" FontSize="12" FontWeight="SemiBold" />
+                                <TextBlock Style="{StaticResource HintTextStyle}"
+                                           Text="源列表在「文件源」页管理；此处仅展示数量。" />
+                                <TextBlock x:Name="AccountCountText" FontSize="12" Opacity="0.7" />
+                            </StackPanel>
+                            <StackPanel Spacing="6">
+                                <TextBlock Text="下载队列" FontSize="12" FontWeight="SemiBold" />
+                                <StackPanel Spacing="4">
+                                    <TextBlock Text="最大并发数" FontSize="12" />
+                                    <NumberBox x:Name="QueueConcurrencyBox" Minimum="1" Maximum="8" Value="1"
+                                               SpinButtonPlacementMode="Compact" SmallChange="1" LargeChange="1"
+                                               ValueChanged="QueueConcurrencyBox_ValueChanged" />
+                                </StackPanel>
+                                <TextBlock x:Name="QueueConcurrencyStatusText" Style="{StaticResource HintTextStyle}"
+                                           Text="wdmm_queue_get/set_concurrency；范围 1–8。" />
+                            </StackPanel>
+                            <StackPanel Spacing="10">
+                                <TextBlock Text="传输加密" FontSize="12" FontWeight="SemiBold" />
+                                <ToggleSwitch x:Name="CryptSequentialDownloadToggle" Header="顺序下载加密（AES-256-GCM）" MinWidth="0" />
+                                <ToggleSwitch x:Name="PreferLibsodiumToggle" Header="优先使用 libsodium secretbox" MinWidth="0" />
+                            </StackPanel>
+                            <StackPanel Spacing="10">
+                                <TextBlock Text="分片下载" FontSize="12" FontWeight="SemiBold" />
+                                <StackPanel Spacing="4">
+                                    <TextBlock Text="分片大小（字节，0 = 禁用）" FontSize="12" />
+                                    <TextBox x:Name="DownloadPartSizeBox" PlaceholderText="例如 10485760" />
+                                </StackPanel>
+                                <StackPanel Spacing="4">
+                                    <TextBlock Text="分片数量（0 = 禁用）" FontSize="12" />
+                                    <TextBox x:Name="DownloadPartCountBox" PlaceholderText="例如 4" />
+                                </StackPanel>
+                            </StackPanel>
+                            <StackPanel Spacing="10">
+                                <TextBlock Text="DLNA 投屏" FontSize="12" FontWeight="SemiBold" />
+                                <ToggleSwitch x:Name="DlnaRemuxToggle" Header="启用 DLNA remux（直接复用）" MinWidth="0" />
+                                <ToggleSwitch x:Name="DlnaTranscodeToggle" Header="启用 DLNA 转码" MinWidth="0" />
+                            </StackPanel>
+                            <Button x:Name="SaveNetwork2Btn" Click="SaveNetwork2Btn_Click" Content="保存"
+                                    Style="{StaticResource AccentButtonStyle}" Padding="16,8" />
+                            <TextBlock x:Name="Network2StatusText" FontSize="11" Visibility="Collapsed" />
+                        </StackPanel>
+                    </ScrollViewer>
+                </TabViewItem>
 
-                    <!-- ── Section 2: 媒体库 ── -->
-                    <StackPanel x:Name="PanelLibrary" Spacing="16" Visibility="Collapsed">
-                        <TextBlock Style="{StaticResource SectionHeaderStyle}" Text="媒体库" />
-                        <InfoBar IsOpen="True" IsClosable="False" Severity="Informational"
-                                 Title="KV-backed (Wave C)"
-                                 Message="以下设置通过 wdmm_kv_* 写入 Core KV，重启后生效。媒体库读写本身仍走 wdmm_track_list / wdmm_library_init。" />
+                <!-- 视频/图片/文件 -->
+                <TabViewItem x:Name="TabVideoFile" Header="视频/图片/文件" Tag="VideoFile">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="20,16,20,16">
+                        <StackPanel x:Name="PanelVideoFile" Spacing="16">
+                            <TextBlock Style="{StaticResource SectionHeaderStyle}" Text="视频 / 图片 / 文件类型" />
+                            <TextBlock Style="{StaticResource HintTextStyle}"
+                                       Text="file_type_config_json 通过 wdmm_kv_* 写入 Core。" />
+                            <StackPanel Spacing="6">
+                                <TextBlock Text="文件类型配置 (JSON)" FontSize="12" FontWeight="SemiBold" />
+                                <TextBox x:Name="FileTypeConfigBox" AcceptsReturn="True" TextWrapping="Wrap"
+                                         MinHeight="120"
+                                         PlaceholderText='例如 {"video":["mp4","mkv"],"audio":["flac","mp3"]}'
+                                         FontFamily="Cascadia Mono,Consolas,monospace" FontSize="11" />
+                            </StackPanel>
+                            <Button x:Name="SaveVideoFileBtn" Click="SaveVideoFileBtn_Click" Content="保存"
+                                    Style="{StaticResource AccentButtonStyle}" Padding="16,8" />
+                            <TextBlock x:Name="VideoFileStatusText" FontSize="11" Visibility="Collapsed" />
+                        </StackPanel>
+                    </ScrollViewer>
+                </TabViewItem>
 
-                        <StackPanel Spacing="10">
-                            <TextBlock Text="扫描选项" FontSize="12" FontWeight="SemiBold" />
-                            <ToggleSwitch x:Name="ScanRecursiveToggle"
-                                          Header="递归扫描子目录"
-                                          MinWidth="0" />
-                            <StackPanel Spacing="4">
-                                <TextBlock Text="最大扫描深度" FontSize="12" />
-                                <NumberBox x:Name="ScanDepthBox"
-                                           Minimum="1" Maximum="32" Value="5"
+                <!-- 杂项 -->
+                <TabViewItem x:Name="TabMisc" Header="杂项" Tag="Misc">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="20,16,20,16">
+                        <StackPanel x:Name="PanelMisc" Spacing="16">
+                            <TextBlock Style="{StaticResource SectionHeaderStyle}" Text="杂项" />
+                            <StackPanel Spacing="6">
+                                <TextBlock Text="主题" FontSize="12" FontWeight="SemiBold" />
+                                <ComboBox x:Name="ThemeCombo" HorizontalAlignment="Stretch">
+                                    <ComboBoxItem Content="跟随系统" Tag="Default" IsSelected="True" />
+                                    <ComboBoxItem Content="浅色" Tag="Light" />
+                                    <ComboBoxItem Content="深色" Tag="Dark" />
+                                </ComboBox>
+                            </StackPanel>
+                            <StackPanel Spacing="6">
+                                <TextBlock Text="界面语言" FontSize="12" FontWeight="SemiBold" />
+                                <ComboBox x:Name="LocaleCombo" HorizontalAlignment="Stretch">
+                                    <ComboBoxItem Content="跟随系统" Tag="system" IsSelected="True" />
+                                    <ComboBoxItem Content="简体中文" Tag="zh-CN" />
+                                    <ComboBoxItem Content="English" Tag="en" />
+                                </ComboBox>
+                            </StackPanel>
+                            <StackPanel Spacing="6">
+                                <TextBlock Text="提示持续时间（秒）" FontSize="12" FontWeight="SemiBold" />
+                                <NumberBox x:Name="SnackDurationBox" Minimum="1" Maximum="30" Value="3"
                                            SpinButtonPlacementMode="Compact" />
                             </StackPanel>
+                            <Button x:Name="SaveMiscBtn" Click="SaveMiscBtn_Click" Content="应用"
+                                    Style="{StaticResource AccentButtonStyle}" Padding="16,8" />
+                            <TextBlock x:Name="MiscStatusText" FontSize="11" Visibility="Collapsed" />
                         </StackPanel>
+                    </ScrollViewer>
+                </TabViewItem>
 
-                        <StackPanel Spacing="10">
-                            <TextBlock Text="媒体类型" FontSize="12" FontWeight="SemiBold" />
-                            <ToggleSwitch x:Name="ScanAudioToggle"
-                                          Header="扫描音频文件"
-                                          MinWidth="0" />
-                            <ToggleSwitch x:Name="ScanVideoToggle"
-                                          Header="扫描视频文件"
-                                          MinWidth="0" />
-                            <ToggleSwitch x:Name="ScanMangaToggle"
-                                          Header="扫描漫画/图片"
-                                          MinWidth="0" />
-                        </StackPanel>
-
-                        <Button x:Name="SaveLibraryBtn"
-                                Click="SaveLibraryBtn_Click"
-                                Content="保存"
-                                Style="{StaticResource AccentButtonStyle}"
-                                Padding="16,8" />
-                        <TextBlock x:Name="LibraryStatusText" FontSize="11" Visibility="Collapsed" />
-                    </StackPanel>
-
-                    <!-- ── Section 3: 网络库 ── -->
-                    <StackPanel x:Name="PanelNetwork2" Spacing="16" Visibility="Collapsed">
-                        <TextBlock Style="{StaticResource SectionHeaderStyle}" Text="文件源" />
-
-                        <StackPanel Spacing="6">
-                            <TextBlock Text="账号" FontSize="12" FontWeight="SemiBold" />
+                <!-- 同步与备份 -->
+                <TabViewItem x:Name="TabSync" Header="同步与备份" Tag="Sync">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="20,16,20,16">
+                        <StackPanel x:Name="PanelSync" Spacing="16">
+                            <TextBlock Style="{StaticResource SectionHeaderStyle}" Text="同步与备份" />
                             <TextBlock Style="{StaticResource HintTextStyle}"
-                                       Text="源列表在「文件源」页管理；此处仅展示数量。" />
-                            <TextBlock x:Name="AccountCountText" FontSize="12" Opacity="0.7" />
-                        </StackPanel>
+                                       Text="对齐安卓同步与备份：KV（sync_* / playlist_sync_enabled）+ wdmm_sync_trigger。备份归档无 FFI，故不提供。" />
 
-                        <StackPanel Spacing="6">
-                            <TextBlock Text="下载队列设置" FontSize="12" FontWeight="SemiBold" />
-                            <StackPanel Spacing="4">
-                                <TextBlock Text="最大并发数" FontSize="12" />
-                                <NumberBox x:Name="QueueConcurrencyBox"
-                                           Minimum="1" Maximum="8" Value="1"
-                                           SpinButtonPlacementMode="Compact"
-                                           SmallChange="1" LargeChange="1"
-                                           ValueChanged="QueueConcurrencyBox_ValueChanged" />
+                            <StackPanel Spacing="6">
+                                <TextBlock x:Name="SyncSourceLabel" Text="源" FontSize="12" FontWeight="SemiBold" />
+                                <ComboBox x:Name="SyncSourceCombo" HorizontalAlignment="Stretch" />
+                                <TextBlock Style="{StaticResource HintTextStyle}"
+                                           Text="源在「文件源」页管理；同步使用该源的 WebDAV 凭据。" />
                             </StackPanel>
-                            <TextBlock x:Name="QueueConcurrencyStatusText"
-                                       Style="{StaticResource HintTextStyle}"
-                                       Text="通过 wdmm_queue_get/set_concurrency（Core Wave D）设置；范围 1–8。" />
-                        </StackPanel>
 
-                        <StackPanel Spacing="10">
-                            <TextBlock Text="传输加密" FontSize="12" FontWeight="SemiBold" />
-                            <ToggleSwitch x:Name="CryptSequentialDownloadToggle"
-                                          Header="顺序下载加密（AES-256-GCM）"
-                                          MinWidth="0" />
-                            <ToggleSwitch x:Name="PreferLibsodiumToggle"
-                                          Header="优先使用 libsodium secretbox"
-                                          MinWidth="0" />
-                        </StackPanel>
-
-                        <StackPanel Spacing="10">
-                            <TextBlock Text="分片下载" FontSize="12" FontWeight="SemiBold" />
-                            <StackPanel Spacing="4">
-                                <TextBlock Text="分片大小（字节，0 = 禁用）" FontSize="12" />
-                                <TextBox x:Name="DownloadPartSizeBox"
-                                         PlaceholderText="例如 10485760" />
+                            <StackPanel Spacing="6">
+                                <TextBlock Text="远端路径" FontSize="12" FontWeight="SemiBold" />
+                                <TextBox x:Name="SyncRemoteDirBox" PlaceholderText="/wdmm-sync" />
+                                <TextBlock Style="{StaticResource HintTextStyle}"
+                                           Text="键 sync_remote_root；凭证、歌单与音乐库共用此远端路径。" />
                             </StackPanel>
-                            <StackPanel Spacing="4">
-                                <TextBlock Text="分片数量（0 = 禁用）" FontSize="12" />
-                                <TextBox x:Name="DownloadPartCountBox"
-                                         PlaceholderText="例如 4" />
+
+                            <StackPanel Spacing="6">
+                                <TextBlock Text="自动同步间隔" FontSize="12" FontWeight="SemiBold" />
+                                <ComboBox x:Name="SyncIntervalCombo" HorizontalAlignment="Stretch">
+                                    <ComboBoxItem Content="关闭（仅手动）" Tag="off" IsSelected="True" />
+                                    <ComboBoxItem Content="每 15 分钟" Tag="15m" />
+                                    <ComboBoxItem Content="每 30 分钟" Tag="30m" />
+                                    <ComboBoxItem Content="每小时" Tag="1h" />
+                                    <ComboBoxItem Content="每 6 小时" Tag="6h" />
+                                    <ComboBoxItem Content="每天" Tag="24h" />
+                                </ComboBox>
+                                <TextBlock Style="{StaticResource HintTextStyle}" Text="键 sync_interval（对齐安卓 SyncInterval）。" />
                             </StackPanel>
-                        </StackPanel>
 
-                        <StackPanel Spacing="10">
-                            <TextBlock Text="DLNA 投屏" FontSize="12" FontWeight="SemiBold" />
-                            <ToggleSwitch x:Name="DlnaRemuxToggle"
-                                          Header="启用 DLNA remux（直接复用）"
-                                          MinWidth="0" />
-                            <ToggleSwitch x:Name="DlnaTranscodeToggle"
-                                          Header="启用 DLNA 转码"
-                                          MinWidth="0" />
-                        </StackPanel>
+                            <ToggleSwitch x:Name="PlaylistSyncToggle" Header="同步歌单" MinWidth="0" />
+                            <TextBlock Style="{StaticResource HintTextStyle}" Text="键 playlist_sync_enabled。" />
 
-                        <Button x:Name="SaveNetwork2Btn"
-                                Click="SaveNetwork2Btn_Click"
-                                Content="保存"
-                                Style="{StaticResource AccentButtonStyle}"
-                                Padding="16,8" />
-                        <TextBlock x:Name="Network2StatusText" FontSize="11" Visibility="Collapsed" />
-                    </StackPanel>
+                            <ToggleSwitch x:Name="SyncEncryptPasswordToggle" Header="加密同步口令/敏感字段" MinWidth="0" />
+                            <TextBlock Style="{StaticResource HintTextStyle}" Text="键 sync_encrypt_password。" />
 
-                    <!-- ── Section 4: 视频/图片/文件类型 ── -->
-                    <StackPanel x:Name="PanelVideoFile" Spacing="16" Visibility="Collapsed">
-                        <TextBlock Style="{StaticResource SectionHeaderStyle}" Text="视频 / 图片 / 文件类型" />
-                        <InfoBar IsOpen="True" IsClosable="False" Severity="Informational"
-                                 Title="KV-backed (Wave C)"
-                                 Message="file_type_config_json 通过 wdmm_kv_* 写入 Core KV；其他文件类型偏好仍待 wdmm_prefs_* FFI。" />
-                        <StackPanel Spacing="6">
-                            <TextBlock Text="文件类型配置 (JSON)" FontSize="12" FontWeight="SemiBold" />
-                            <TextBox x:Name="FileTypeConfigBox"
-                                     AcceptsReturn="True"
-                                     TextWrapping="Wrap"
-                                     MinHeight="80"
-                                     PlaceholderText='例如 {"video":["mp4","mkv"],"audio":["flac","mp3"]}'
-                                     FontFamily="Cascadia Mono,Consolas,monospace"
-                                     FontSize="11" />
-                        </StackPanel>
-                        <Button x:Name="SaveVideoFileBtn"
-                                Click="SaveVideoFileBtn_Click"
-                                Content="保存"
-                                Style="{StaticResource AccentButtonStyle}"
-                                Padding="16,8" />
-                        <TextBlock x:Name="VideoFileStatusText" FontSize="11" Visibility="Collapsed" />
-                    </StackPanel>
-
-                    <!-- ── Section 5: 杂项 ── -->
-                    <StackPanel x:Name="PanelMisc" Spacing="16" Visibility="Collapsed">
-                        <TextBlock Style="{StaticResource SectionHeaderStyle}" Text="杂项" />
-
-                        <StackPanel Spacing="6">
-                            <TextBlock Text="主题" FontSize="12" FontWeight="SemiBold" />
-                            <ComboBox x:Name="ThemeCombo"
-                                      HorizontalAlignment="Stretch">
-                                <ComboBoxItem Content="跟随系统" Tag="Default"  IsSelected="True" />
-                                <ComboBoxItem Content="浅色"     Tag="Light" />
-                                <ComboBoxItem Content="深色"     Tag="Dark" />
-                            </ComboBox>
-                            <TextBlock Style="{StaticResource HintTextStyle}"
-                                       Text="更改主题立即生效（WinUI ElementTheme）。" />
-                        </StackPanel>
-
-                        <StackPanel Spacing="6">
-                            <TextBlock Text="界面语言" FontSize="12" FontWeight="SemiBold" />
-                            <ComboBox x:Name="LocaleCombo"
-                                      HorizontalAlignment="Stretch">
-                                <ComboBoxItem Content="跟随系统" Tag="system" IsSelected="True" />
-                                <ComboBoxItem Content="简体中文" Tag="zh-CN" />
-                                <ComboBoxItem Content="English"  Tag="en" />
-                            </ComboBox>
-                            <TextBlock Style="{StaticResource HintTextStyle}"
-                                       Text="app_locale 通过 wdmm_kv_* 持久化。" />
-                        </StackPanel>
-
-                        <StackPanel Spacing="6">
-                            <TextBlock Text="提示持续时间（秒）" FontSize="12" FontWeight="SemiBold" />
-                            <NumberBox x:Name="SnackDurationBox"
-                                       Minimum="1" Maximum="30" Value="3"
-                                       SpinButtonPlacementMode="Compact" />
-                            <TextBlock Style="{StaticResource HintTextStyle}"
-                                       Text="snack_duration 通过 wdmm_kv_* 持久化。" />
-                        </StackPanel>
-
-                        <Button x:Name="SaveMiscBtn"
-                                Click="SaveMiscBtn_Click"
-                                Content="应用"
-                                Style="{StaticResource AccentButtonStyle}"
-                                Padding="16,8" />
-                        <TextBlock x:Name="MiscStatusText" FontSize="11" Visibility="Collapsed" />
-                    </StackPanel>
-
-                    <!-- ── Section 6: 同步与备份 ── -->
-                    <StackPanel x:Name="PanelSync" Spacing="16" Visibility="Collapsed">
-                        <TextBlock Style="{StaticResource SectionHeaderStyle}" Text="同步与备份" />
-
-                        <StackPanel Spacing="6">
-                            <TextBlock Text="源" FontSize="12" FontWeight="SemiBold" />
-                            <ComboBox x:Name="SyncSourceCombo" HorizontalAlignment="Stretch" />
-                            <TextBlock Style="{StaticResource HintTextStyle}"
-                                       Text="源在「文件源」页管理；同步使用该源的 WebDAV 凭据。" />
-                        </StackPanel>
-
-                        <StackPanel Spacing="6">
-                            <TextBlock Text="远端路径" FontSize="12" FontWeight="SemiBold" />
-                            <TextBox x:Name="SyncRemoteDirBox"
-                                     PlaceholderText="/wdmm-sync" />
-                            <TextBlock Style="{StaticResource HintTextStyle}"
-                                       Text="凭证、歌单与音乐库共用此远端路径（对齐安卓同步与备份）。" />
-                        </StackPanel>
-
-                        <Button x:Name="TriggerSyncBtn"
-                                Click="TriggerSyncBtn_Click"
-                                Content="立即同步"
-                                Padding="16,8" />
-                        <TextBlock x:Name="SyncStatusText" FontSize="11" TextWrapping="Wrap" Visibility="Collapsed" />
-                    </StackPanel>
-
-                    <!-- ── Section 7: 第三方/开发者 (OpenAPI) ── -->
-                    <StackPanel x:Name="PanelOpenApi" Spacing="16" Visibility="Collapsed">
-                        <TextBlock Style="{StaticResource SectionHeaderStyle}" Text="第三方 / 开发者 (OpenAPI)" />
-                        <TextBlock Style="{StaticResource HintTextStyle}"
-                                   Text="OpenAPI 服务器仅供第三方 HTTP 客户端使用（如脚本、外部工具）。桌面应用内部业务路径使用 FFI，不依赖此服务器。" />
-
-                        <StackPanel Spacing="6">
-                            <TextBlock Text="绑定模式" FontSize="12" FontWeight="SemiBold" />
-                            <ComboBox x:Name="BindModeCombo"
-                                      HorizontalAlignment="Stretch"
-                                      SelectedIndex="0">
-                                <ComboBoxItem Content="Local (127.0.0.1)" />
-                                <ComboBoxItem Content="Global (0.0.0.0)" />
-                                <ComboBoxItem Content="Custom" />
-                            </ComboBox>
-                        </StackPanel>
-
-                        <StackPanel Spacing="6">
-                            <TextBlock Text="端口" FontSize="12" FontWeight="SemiBold" />
-                            <TextBox x:Name="PortBox"
-                                     Text="8080"
-                                     PlaceholderText="1024-65535"
-                                     InputScope="Number"
-                                     MaxLength="5" />
-                        </StackPanel>
-
-                        <StackPanel Spacing="6">
-                            <TextBlock Text="API Token（只读）" FontSize="12" FontWeight="SemiBold" />
-                            <TextBox x:Name="TokenBox"
-                                     IsReadOnly="True"
-                                     FontFamily="Cascadia Mono,Consolas,monospace"
-                                     FontSize="11" />
                             <StackPanel Orientation="Horizontal" Spacing="8">
-                                <Button x:Name="StartApiBtn"
-                                        Content="启动服务器"
-                                        Click="StartApiBtn_Click"
-                                        Padding="12,6" />
-                                <Button x:Name="StopApiBtn"
-                                        Content="停止服务器"
-                                        Click="StopApiBtn_Click"
-                                        Padding="12,6" />
-                                <Button x:Name="RotateTokenBtn"
-                                        Content="轮换 Token"
-                                        Click="RotateTokenBtn_Click"
-                                        Padding="12,6" />
+                                <Button x:Name="SaveSyncBtn" Click="SaveSyncBtn_Click" Content="保存设置"
+                                        Style="{StaticResource AccentButtonStyle}" Padding="16,8" />
+                                <Button x:Name="TriggerSyncBtn" Click="TriggerSyncBtn_Click" Content="立即同步" Padding="16,8" />
                             </StackPanel>
-                            <TextBlock Style="{StaticResource HintTextStyle}"
-                                       Text="本机 FFI 客户端不需要 Token；外部 HTTP 客户端须在 Authorization 头携带它。" />
+                            <TextBlock x:Name="SyncStatusText" FontSize="11" TextWrapping="Wrap" Visibility="Collapsed" />
                         </StackPanel>
+                    </ScrollViewer>
+                </TabViewItem>
 
-                        <TextBlock x:Name="SaveStatusText"
-                                   FontSize="12"
-                                   TextWrapping="Wrap"
-                                   Visibility="Collapsed" />
-                    </StackPanel>
-
-                </Grid>
-            </ScrollViewer>
+                <!-- OpenAPI -->
+                <TabViewItem x:Name="TabOpenApi" Header="第三方/开发者" Tag="OpenApi">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="20,16,20,16">
+                        <StackPanel x:Name="PanelOpenApi" Spacing="16">
+                            <TextBlock Style="{StaticResource SectionHeaderStyle}" Text="第三方 / 开发者 (OpenAPI)" />
+                            <TextBlock Style="{StaticResource HintTextStyle}"
+                                       Text="OpenAPI 仅供第三方 HTTP 客户端。桌面内部业务走 FFI。" />
+                            <StackPanel Spacing="6">
+                                <TextBlock Text="绑定模式" FontSize="12" FontWeight="SemiBold" />
+                                <ComboBox x:Name="BindModeCombo" HorizontalAlignment="Stretch" SelectedIndex="0">
+                                    <ComboBoxItem Content="Local (127.0.0.1)" />
+                                    <ComboBoxItem Content="Global (0.0.0.0)" />
+                                    <ComboBoxItem Content="Custom" />
+                                </ComboBox>
+                            </StackPanel>
+                            <StackPanel Spacing="6">
+                                <TextBlock Text="端口" FontSize="12" FontWeight="SemiBold" />
+                                <TextBox x:Name="PortBox" Text="8080" PlaceholderText="1024-65535"
+                                         InputScope="Number" MaxLength="5" />
+                            </StackPanel>
+                            <StackPanel Spacing="6">
+                                <TextBlock Text="API Token（只读）" FontSize="12" FontWeight="SemiBold" />
+                                <TextBox x:Name="TokenBox" IsReadOnly="True"
+                                         FontFamily="Cascadia Mono,Consolas,monospace" FontSize="11" />
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <Button x:Name="StartApiBtn" Content="启动服务器" Click="StartApiBtn_Click" Padding="12,6" />
+                                    <Button x:Name="StopApiBtn" Content="停止服务器" Click="StopApiBtn_Click" Padding="12,6" />
+                                    <Button x:Name="RotateTokenBtn" Content="轮换 Token" Click="RotateTokenBtn_Click" Padding="12,6" />
+                                </StackPanel>
+                            </StackPanel>
+                            <TextBlock x:Name="SaveStatusText" FontSize="12" TextWrapping="Wrap" Visibility="Collapsed" />
+                        </StackPanel>
+                    </ScrollViewer>
+                </TabViewItem>
+            </TabView>
         </Grid>
     </Border>
 </ContentDialog>

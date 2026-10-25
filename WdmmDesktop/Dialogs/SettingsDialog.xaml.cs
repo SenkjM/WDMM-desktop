@@ -10,13 +10,9 @@ using WdmmDesktop.Services;
 namespace WdmmDesktop.Dialogs
 {
     /// <summary>
-    /// Settings dialog — Android settings_screen.dart section parity.
-    /// Sections: 主页与导航 / 媒体库 / 文件源 / 视频·图片·文件 / 杂项 /
-    /// 同步与备份 / 第三方·开发者(OpenAPI).
-    ///
-    /// Hard rule: disabled「待 FFI」controls never pretend a save succeeded.
-    /// Real local prefs persist via LocalStore JSON. OpenAPI controls are the
-    /// ONLY place Bind/Port/Token belong (third-party API, not core app settings).
+    /// Settings dialog — Android settings_screen.dart section parity via TabView.
+    /// Sync &amp; Backup mirrors sync_screen.dart KV keys + wdmm_sync_trigger
+    /// (no backup archive UI — no backup FFI). Sources via AccountStore FFI.
     /// </summary>
     public sealed partial class SettingsDialog : ContentDialog
     {
@@ -28,7 +24,6 @@ namespace WdmmDesktop.Dialogs
         public SettingsDialog(string ffiVersion)
         {
             InitializeComponent();
-            ShowPanel("Home");
             _ffiVersion = ffiVersion;
             FfiVersionText.Text = $"wdmm-core {ffiVersion}";
 
@@ -40,27 +35,11 @@ namespace WdmmDesktop.Dialogs
             ApplySyncLoc();
         }
 
-        // ── Section switching ──────────────────────────────────────────────────
+        // ── TabView section switching (panels live inside TabViewItem content) ─
 
-        private void SettingsNav_Checked(object sender, RoutedEventArgs e)
+        private void SettingsTabs_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            if (sender is not RadioButton rb || rb.Tag is not string tag) return;
-            ShowPanel(tag);
-        }
-
-        private void ShowPanel(string tag)
-        {
-            // NavHome IsChecked=True fires Checked during InitializeComponent before
-            // later x:Name panels are assigned — guard until the tree is ready.
-            if (PanelHome is null || PanelOpenApi is null) return;
-
-            PanelHome.Visibility     = tag == "Home"     ? Visibility.Visible : Visibility.Collapsed;
-            PanelLibrary.Visibility  = tag == "Library" ? Visibility.Visible : Visibility.Collapsed;
-            PanelNetwork2.Visibility = tag == "Network2" ? Visibility.Visible : Visibility.Collapsed;
-            PanelVideoFile.Visibility= tag == "VideoFile"? Visibility.Visible : Visibility.Collapsed;
-            PanelMisc.Visibility     = tag == "Misc"    ? Visibility.Visible : Visibility.Collapsed;
-            PanelSync.Visibility     = tag == "Sync"     ? Visibility.Visible : Visibility.Collapsed;
-            PanelOpenApi.Visibility  = tag == "OpenApi"  ? Visibility.Visible : Visibility.Collapsed;
+            // Content is hosted in each TabViewItem — nothing to show/hide.
         }
 
         // ── Local prefs persistence ───────────────────────────────────────────
@@ -195,7 +174,7 @@ namespace WdmmDesktop.Dialogs
 
         private void ApplySyncLoc()
         {
-            if (NavSync != null) NavSync.Content = Loc.Get("Settings.SyncBackup");
+            if (TabSync != null) TabSync.Header = Loc.Get("Settings.SyncBackup");
             if (TriggerSyncBtn != null) TriggerSyncBtn.Content = Loc.Get("Settings.SyncNow");
         }
 
@@ -208,6 +187,7 @@ namespace WdmmDesktop.Dialogs
             var dir = string.IsNullOrWhiteSpace(SyncRemoteDirBox?.Text) ? "/wdmm-sync" : SyncRemoteDirBox.Text.Trim();
             _prefs.SyncRemoteDir = dir;
             LocalStore.Save(PrefsFile, _prefs);
+            try { NativeMethods.KvSet("sync_remote_root", dir); } catch { }
             if (string.IsNullOrEmpty(url))
             {
                 ShowInlineStatus(SyncStatusText, "请先在文件源中添加源", isError: true);
@@ -217,6 +197,30 @@ namespace WdmmDesktop.Dialogs
             try { result = NativeMethods.WithNativeSyncTrigger(url, user, pass, dir); }
             catch (Exception ex) { result = "error:" + ex.Message; }
             ShowInlineStatus(SyncStatusText, result, isError: result.StartsWith("error:"));
+        }
+
+        private void SaveSyncBtn_Click(object sender, RoutedEventArgs e)
+        {
+            var errs = new System.Text.StringBuilder();
+            void Set(string k, string v)
+            {
+                try
+                {
+                    var r = NativeMethods.KvSet(k, v);
+                    if (r.StartsWith("error:")) errs.Append(k).Append(':').Append(r).Append(' ');
+                }
+                catch (Exception ex) { errs.Append(k).Append(':').Append(ex.Message).Append(' '); }
+            }
+            var dir = string.IsNullOrWhiteSpace(SyncRemoteDirBox?.Text) ? "/wdmm-sync" : SyncRemoteDirBox.Text.Trim();
+            _prefs.SyncRemoteDir = dir;
+            LocalStore.Save(PrefsFile, _prefs);
+            Set("sync_remote_root", dir);
+            Set("sync_interval", SelectedComboTag(SyncIntervalCombo));
+            Set("playlist_sync_enabled", PlaylistSyncToggle.IsOn ? "1" : "0");
+            Set("sync_encrypt_password", SyncEncryptPasswordToggle.IsOn ? "1" : "0");
+            ShowInlineStatus(SyncStatusText,
+                errs.Length > 0 ? $"部分保存失败：{errs}" : "同步设置已保存。",
+                isError: errs.Length > 0);
         }
 
         private void ShowSyncStatus(string msg, bool isError)
@@ -353,6 +357,9 @@ namespace WdmmDesktop.Dialogs
             }
             try
             {
+                Set("media_scan_recursive", ScanRecursiveToggle.IsOn ? "1" : "0");
+                Set("media_scan_max_depth", ((int)ScanDepthBox.Value).ToString());
+                // Keep legacy scan_* mirrors for older Desktop builds reading them.
                 Set("scan_recursive", ScanRecursiveToggle.IsOn ? "1" : "0");
                 Set("scan_depth",     ((int)ScanDepthBox.Value).ToString());
                 Set("scan_audio",     ScanAudioToggle.IsOn       ? "1" : "0");
@@ -431,11 +438,23 @@ namespace WdmmDesktop.Dialogs
             try
             {
                 // ── Library ───────────────────────────────────────────────────
-                ScanRecursiveToggle.IsOn = KvBool("scan_recursive", defaultVal: true);
-                ScanDepthBox.Value       = KvInt ("scan_depth",     defaultVal: 5);
+                // Prefer Android key names; fall back to legacy Desktop keys.
+                ScanRecursiveToggle.IsOn = KvBool("media_scan_recursive",
+                    defaultVal: KvBool("scan_recursive", defaultVal: true));
+                ScanDepthBox.Value       = KvInt("media_scan_max_depth",
+                    defaultVal: KvInt("scan_depth", defaultVal: 1));
                 ScanAudioToggle.IsOn     = KvBool("scan_audio",     defaultVal: true);
                 ScanVideoToggle.IsOn     = KvBool("scan_video",     defaultVal: true);
                 ScanMangaToggle.IsOn     = KvBool("scan_manga",     defaultVal: false);
+
+                // Sync & Backup (Android-shaped)
+                var remote = KvString("sync_remote_root");
+                if (!string.IsNullOrEmpty(remote)) SyncRemoteDirBox.Text = remote;
+                else if (!string.IsNullOrEmpty(_prefs.SyncRemoteDir)) SyncRemoteDirBox.Text = _prefs.SyncRemoteDir ?? "";
+                SelectComboByTag(SyncIntervalCombo, KvString("sync_interval").Length > 0
+                    ? KvString("sync_interval") : "off");
+                PlaylistSyncToggle.IsOn = KvBool("playlist_sync_enabled", defaultVal: false);
+                SyncEncryptPasswordToggle.IsOn = KvBool("sync_encrypt_password", defaultVal: false);
 
                 // ── Network2 ─────────────────────────────────────────────────
                 CryptSequentialDownloadToggle.IsOn = KvBool("crypt_sequential_download", false);
