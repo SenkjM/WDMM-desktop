@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Runtime.InteropServices;
 using Microsoft.UI.Xaml;
+using WdmmDesktop.Services;
 
 namespace WdmmDesktop
 {
@@ -43,6 +44,8 @@ namespace WdmmDesktop
 
         protected override void OnLaunched(LaunchActivatedEventArgs args)
         {
+            try { AccountStore.MigrateFromLocalJsonIfNeeded(); }
+            catch { /* best-effort legacy migrate */ }
             MainWindow = new MainWindow();
             MainWindow.Activate();
         }

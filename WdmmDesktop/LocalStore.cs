@@ -7,10 +7,8 @@ using System.Text.Json.Serialization;
 namespace WdmmDesktop
 {
     /// <summary>
-    /// Local JSON persistence for app data that the FFI does not yet manage
-    /// (WebDAV accounts, per-USN DMR preferences). All files live under
-    /// %LOCALAPPDATA%\Wdmm. Used only while wdmm_account_* / wdmm_dmr_pref_*
-    /// are not exported — see the TODOs on the relevant model classes.
+    /// Local JSON for Desktop-only prefs (desktop_prefs, DMR until Core prefs land).
+    /// Cloud sources use <see cref="Services.AccountStore"/> / wdmm_account_* — not accounts.json.
     /// </summary>
     internal static class LocalStore
     {
@@ -27,7 +25,6 @@ namespace WdmmDesktop
         private static string PathFor(string file) =>
             System.IO.Path.Combine(Root, file);
 
-        /// <summary>Load (or default) a JSON file, creating the root dir on first use.</summary>
         public static T Load<T>(string file, T defaultValue) where T : class
         {
             try
@@ -56,14 +53,6 @@ namespace WdmmDesktop
                 // Persistence is best-effort; never crash the UI on a disk error.
             }
         }
-
-        // Convenience wrappers for the two known files — keeps call sites tidy.
-
-        public static List<Models.WebDavAccount> LoadAccounts() =>
-            Load("accounts.json", new List<Models.WebDavAccount>());
-
-        public static void SaveAccounts(List<Models.WebDavAccount> accounts) =>
-            Save("accounts.json", accounts);
 
         public static Dictionary<string, Models.DmrPref> LoadDmrPrefs() =>
             Load("dmr_prefs.json", new Dictionary<string, Models.DmrPref>());
