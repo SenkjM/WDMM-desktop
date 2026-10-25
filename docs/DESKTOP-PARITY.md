@@ -118,7 +118,7 @@ opt-in HTTP surface for external clients (Settings → 第三方/开发者).
 
 ## Submodule
 
-Current SHA pinned: **2571e01** (Wave C driver FFI: `wdmm_driver_*` + `wdmm_account_list_dir` on Core main).
+Current SHA pinned: **86f9bd6** (Android binary BK dual-read: Core now reads Android binary backup format on restore; Desktop inherits via FFI).
 
 ---
 
@@ -222,6 +222,6 @@ dotnet build -c Debug
 
 ## Settings / Backup / DMR (2026-10-25)
 
-- Core `2571e01` (Wave C): `wdmm_driver_*`, `wdmm_account_list_dir`, `wdmm_account_*`, `wdmm_backup_*` (WDMMBK01/WDMMEN01, PBKDF2 120k), independent `dmr_prefs.db` + `wdmm_dmr_prefs_*`.
-- Desktop: AccountStore; Settings TabView Sync+Backup wired; Cast DMR prefs via FFI (json migrate); Manga write UI; **File source multi-provider via Core account FFI (webdav, baidu_netdisk, 123_open, 115open, aliyundrive_open, terabox, netease_music, ctfile, crypt)**.
-- Still out of scope / true blockers: full Android binary vault/playlist section shapes may not round-trip with Core JSON BK sections; **LocalStream cast needs desktop cloud/crypt drivers (CloudFfi account operations available, but cast glue incomplete)**; local-lib folder mount extras (post-refactor).
+- Core `86f9bd6` (Wave C + Android binary BK dual-read): `wdmm_driver_*`, `wdmm_account_list_dir`, `wdmm_account_*`, `wdmm_backup_*` (WDMMBK01/WDMMEN01, PBKDF2 120k), independent `dmr_prefs.db` + `wdmm_dmr_prefs_*`. Core now dual-reads Android binary BK on restore (Desktop inherits via FFI).
+- Desktop: AccountStore; Settings TabView Sync+Backup wired; Cast DMR prefs via FFI (json migrate); Manga write UI; **File source multi-provider via Core account FFI (webdav, baidu_netdisk, 123_open, 115open, aliyundrive_open, terabox, netease_music, ctfile, crypt)**; crypt nested source with real credentials from resolved account.
+- Still out of scope / true blockers: **LocalStream cast needs desktop cloud/crypt drivers (CloudFfi account operations available, but cast glue incomplete)**; local-lib folder mount extras (post-refactor).
