@@ -220,7 +220,7 @@
                         <StackPanel x:Name="PanelSync" Spacing="16">
                             <TextBlock Style="{StaticResource SectionHeaderStyle}" Text="同步与备份" />
                             <TextBlock Style="{StaticResource HintTextStyle}"
-                                       Text="对齐安卓同步与备份：KV（sync_* / playlist_sync_enabled）+ wdmm_sync_trigger。备份归档无 FFI，故不提供。" />
+                                       Text="对齐安卓同步与备份：KV（sync_* / playlist_sync_enabled）+ wdmm_sync_trigger；备份走 wdmm_backup_*（WDMMBK01/WDMMEN01）。" />
 
                             <StackPanel Spacing="6">
                                 <TextBlock x:Name="SyncSourceLabel" Text="源" FontSize="12" FontWeight="SemiBold" />
@@ -261,6 +261,43 @@
                                 <Button x:Name="TriggerSyncBtn" Click="TriggerSyncBtn_Click" Content="立即同步" Padding="16,8" />
                             </StackPanel>
                             <TextBlock x:Name="SyncStatusText" FontSize="11" TextWrapping="Wrap" Visibility="Collapsed" />
+
+                            <Border Background="{ThemeResource LayerFillColorDefaultBrush}"
+                                    CornerRadius="8" Padding="12,10" Margin="0,8,0,0">
+                                <StackPanel Spacing="12">
+                                    <TextBlock Text="整库备份" FontSize="12" FontWeight="SemiBold" />
+                                    <TextBlock Style="{StaticResource HintTextStyle}"
+                                               Text="WDMMBK01 归档（可选 WDMMEN01 口令加密，PBKDF2 120k，对齐安卓 BackupCrypto）。含凭证、媒体库、设置 KV、漫画、文件夹与 DMR prefs。" />
+
+                                    <StackPanel Spacing="4">
+                                        <TextBlock Text="备份口令（可空 = 明文归档）" FontSize="12" />
+                                        <PasswordBox x:Name="BackupPassphraseBox" PlaceholderText="vault / backup passphrase" />
+                                    </StackPanel>
+
+                                    <StackPanel Spacing="4">
+                                        <TextBlock Text="远端备份目录" FontSize="12" />
+                                        <TextBox x:Name="BackupRemoteDirBox" PlaceholderText="/WebdavMediaManager/backup/" />
+                                        <TextBlock Style="{StaticResource HintTextStyle}" Text="键 backup_remote_path；默认 /WebdavMediaManager/backup/。" />
+                                    </StackPanel>
+
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <Button x:Name="BackupUploadBtn" Click="BackupUploadBtn_Click"
+                                                Content="立即备份并上传" Style="{StaticResource AccentButtonStyle}" Padding="16,8" />
+                                        <Button x:Name="BackupRefreshBtn" Click="BackupRefreshBtn_Click"
+                                                Content="刷新列表" Padding="16,8" />
+                                    </StackPanel>
+
+                                    <StackPanel Spacing="4">
+                                        <TextBlock Text="远端备份文件" FontSize="12" />
+                                        <ComboBox x:Name="BackupFileCombo" HorizontalAlignment="Stretch" />
+                                    </StackPanel>
+
+                                    <Button x:Name="BackupRestoreBtn" Click="BackupRestoreBtn_Click"
+                                            Content="从所选备份恢复" Padding="16,8" />
+                                    <TextBlock x:Name="BackupStatusText" FontSize="11" TextWrapping="Wrap" Visibility="Collapsed" />
+                                </StackPanel>
+                            </Border>
+
                         </StackPanel>
                     </ScrollViewer>
                 </TabViewItem>

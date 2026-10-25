@@ -5,14 +5,15 @@ using System.Text.Json;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using WdmmDesktop.Generated;
+using WdmmDesktop.Models;
 using WdmmDesktop.Services;
 
 namespace WdmmDesktop.Dialogs
 {
     /// <summary>
     /// Settings dialog — Android settings_screen.dart section parity via TabView.
-    /// Sync &amp; Backup mirrors sync_screen.dart KV keys + wdmm_sync_trigger
-    /// (no backup archive UI — no backup FFI). Sources via AccountStore FFI.
+    /// Sync &amp; Backup mirrors sync_screen.dart: KV + wdmm_sync_trigger +
+    /// wdmm_backup_* (WDMMBK01/WDMMEN01). Sources via AccountStore FFI.
     /// </summary>
     public sealed partial class SettingsDialog : ContentDialog
     {
@@ -218,6 +219,15 @@ namespace WdmmDesktop.Dialogs
             Set("sync_interval", SelectedComboTag(SyncIntervalCombo));
             Set("playlist_sync_enabled", PlaylistSyncToggle.IsOn ? "1" : "0");
             Set("sync_encrypt_password", SyncEncryptPasswordToggle.IsOn ? "1" : "0");
+            var bakDir = string.IsNullOrWhiteSpace(BackupRemoteDirBox?.Text)
+                ? "/WebdavMediaManager/backup/"
+                : BackupRemoteDirBox.Text.Trim();
+            if (!bakDir.EndsWith("/")) bakDir += "/";
+            BackupRemoteDirBox.Text = bakDir;
+            Set("backup_remote_path", bakDir);
+            // Persist vault passphrase when the box is non-empty (empty = leave prior KV).
+            if (BackupPassphraseBox != null && !string.IsNullOrEmpty(BackupPassphraseBox.Password))
+                Set("vault_passphrase", BackupPassphraseBox.Password);
             ShowInlineStatus(SyncStatusText,
                 errs.Length > 0 ? $"部分保存失败：{errs}" : "同步设置已保存。",
                 isError: errs.Length > 0);
@@ -230,6 +240,134 @@ namespace WdmmDesktop.Dialogs
                 ? (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["SystemFillColorCriticalBrush"]
                 : (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["TextFillColorPrimaryBrush"];
             SyncStatusText.Visibility = Visibility.Visible;
+        }
+
+
+        private (string url, string user, string pass)? SyncCredsOrNull()
+        {
+            var acc = SyncSourceCombo?.SelectedItem as WebDavAccount;
+            var url = acc?.Url?.Trim() ?? "";
+            if (string.IsNullOrEmpty(url)) return null;
+            return (url, acc?.Username ?? "", acc?.Password ?? "");
+        }
+
+        private string BackupRemoteDir()
+        {
+            var d = string.IsNullOrWhiteSpace(BackupRemoteDirBox?.Text)
+                ? "/WebdavMediaManager/backup/"
+                : BackupRemoteDirBox.Text.Trim();
+            if (!d.EndsWith("/")) d += "/";
+            return d;
+        }
+
+        private async void BackupUploadBtn_Click(object sender, RoutedEventArgs e)
+        {
+            var creds = SyncCredsOrNull();
+            if (creds == null)
+            {
+                ShowInlineStatus(BackupStatusText, "请先在文件源中添加源", isError: true);
+                return;
+            }
+            var (url, user, pass) = creds.Value;
+            var dir = BackupRemoteDir();
+            var phrase = BackupPassphraseBox?.Password ?? "";
+            BackupUploadBtn.IsEnabled = false;
+            ShowInlineStatus(BackupStatusText, "正在备份并上传…", isError: false);
+            string result;
+            try
+            {
+                result = await System.Threading.Tasks.Task.Run(() =>
+                    NativeMethods.BackupUpload(url, user, pass, dir, phrase));
+            }
+            catch (Exception ex) { result = "error:" + ex.Message; }
+            finally { BackupUploadBtn.IsEnabled = true; }
+            ShowInlineStatus(BackupStatusText, result, isError: result.StartsWith("error:"));
+            if (!result.StartsWith("error:"))
+                BackupRefreshBtn_Click(sender, e);
+        }
+
+        private async void BackupRefreshBtn_Click(object sender, RoutedEventArgs e)
+        {
+            var creds = SyncCredsOrNull();
+            if (creds == null)
+            {
+                ShowInlineStatus(BackupStatusText, "请先在文件源中添加源", isError: true);
+                return;
+            }
+            var (url, user, pass) = creds.Value;
+            var dir = BackupRemoteDir();
+            BackupRefreshBtn.IsEnabled = false;
+            string result;
+            try
+            {
+                result = await System.Threading.Tasks.Task.Run(() =>
+                    NativeMethods.BackupList(url, user, pass, dir));
+            }
+            catch (Exception ex) { result = "error:" + ex.Message; }
+            finally { BackupRefreshBtn.IsEnabled = true; }
+
+            if (result.StartsWith("error:"))
+            {
+                ShowInlineStatus(BackupStatusText, result, isError: true);
+                return;
+            }
+            try
+            {
+                var names = System.Text.Json.JsonSerializer.Deserialize<System.Collections.Generic.List<string>>(result)
+                            ?? new System.Collections.Generic.List<string>();
+                BackupFileCombo.Items.Clear();
+                foreach (var n in names) BackupFileCombo.Items.Add(n);
+                if (BackupFileCombo.Items.Count > 0) BackupFileCombo.SelectedIndex = 0;
+                ShowInlineStatus(BackupStatusText,
+                    names.Count == 0 ? "远端无备份文件。" : $"已加载 {names.Count} 个备份。",
+                    isError: false);
+            }
+            catch (Exception ex)
+            {
+                ShowInlineStatus(BackupStatusText, "error:parse:" + ex.Message, isError: true);
+            }
+        }
+
+        private async void BackupRestoreBtn_Click(object sender, RoutedEventArgs e)
+        {
+            var creds = SyncCredsOrNull();
+            if (creds == null)
+            {
+                ShowInlineStatus(BackupStatusText, "请先在文件源中添加源", isError: true);
+                return;
+            }
+            var name = BackupFileCombo?.SelectedItem as string;
+            if (string.IsNullOrEmpty(name))
+            {
+                ShowInlineStatus(BackupStatusText, "请先刷新并选择备份文件", isError: true);
+                return;
+            }
+            var confirm = new ContentDialog
+            {
+                Title = "确认恢复",
+                Content = $"将用远端备份「{name}」覆盖本地媒体库与设置。此操作不可撤销。继续？",
+                PrimaryButtonText = "恢复",
+                CloseButtonText = "取消",
+                DefaultButton = ContentDialogButton.Close,
+                XamlRoot = this.XamlRoot,
+            };
+            if (await confirm.ShowAsync() != ContentDialogResult.Primary) return;
+
+            var (url, user, pass) = creds.Value;
+            var dir = BackupRemoteDir();
+            var remote = dir.TrimEnd('/') + "/" + name.TrimStart('/');
+            var phrase = BackupPassphraseBox?.Password ?? "";
+            BackupRestoreBtn.IsEnabled = false;
+            ShowInlineStatus(BackupStatusText, "正在下载并恢复…", isError: false);
+            string result;
+            try
+            {
+                result = await System.Threading.Tasks.Task.Run(() =>
+                    NativeMethods.BackupDownloadRestore(url, user, pass, remote, phrase));
+            }
+            catch (Exception ex) { result = "error:" + ex.Message; }
+            finally { BackupRestoreBtn.IsEnabled = true; }
+            ShowInlineStatus(BackupStatusText, result, isError: result.StartsWith("error:"));
         }
 
         // ── Section 7: OpenAPI (第三方/开发者) ───────────────────────────────────
@@ -455,6 +593,11 @@ namespace WdmmDesktop.Dialogs
                     ? KvString("sync_interval") : "off");
                 PlaylistSyncToggle.IsOn = KvBool("playlist_sync_enabled", defaultVal: false);
                 SyncEncryptPasswordToggle.IsOn = KvBool("sync_encrypt_password", defaultVal: false);
+                var bak = KvString("backup_remote_path");
+                BackupRemoteDirBox.Text = string.IsNullOrEmpty(bak) ? "/WebdavMediaManager/backup/" : bak;
+                var vault = KvString("vault_passphrase");
+                if (!string.IsNullOrEmpty(vault) && BackupPassphraseBox != null)
+                    BackupPassphraseBox.Password = vault;
 
                 // ── Network2 ─────────────────────────────────────────────────
                 CryptSequentialDownloadToggle.IsOn = KvBool("crypt_sequential_download", false);
