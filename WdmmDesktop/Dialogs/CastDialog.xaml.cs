@@ -109,7 +109,7 @@ namespace WdmmDesktop.Dialogs
         {
             if (sender is not Button btn || btn.DataContext is not DmrDevice dev) return;
             _prefs.TryGetValue(dev.Usn, out var pref);
-            var dlg = new DmrInfoDialog(dev, pref ?? new DmrPref()) { XamlRoot = Content.XamlRoot };
+            var dlg = new DmrInfoDialog(dev, pref ?? new DmrPref()) { XamlRoot = this.XamlRoot };
             await dlg.ShowAsync();
         }
 
