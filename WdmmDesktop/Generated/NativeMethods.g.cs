@@ -332,6 +332,28 @@ namespace WdmmDesktop.Generated
         public static extern FfiString wdmm_track_delete(IntPtr id);
 
         /// <summary>
+        /// Delete all tracks for a given account/source (account_id).
+        /// <paramref name="accountId"/> must be a null-terminated UTF-8 string.
+        /// Returns "ok" or "error:…". Caller must free the result.
+        /// </summary>
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern FfiString wdmm_track_delete_by_source(IntPtr accountId);
+
+        /// <summary>
+        /// Clear the entire library (tracks, playlists, manga, CUE sheets).
+        /// Returns "ok" or "error:…". Caller must free the result.
+        /// </summary>
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern FfiString wdmm_library_clear_all();
+
+        /// <summary>
+        /// Clear the library index only (tracks, CUE sheets, deleted_tracks) — preserves playlists and manga.
+        /// Returns "ok" or "error:…". Caller must free the result.
+        /// </summary>
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern FfiString wdmm_library_clear_index();
+
+        /// <summary>
         /// One-shot import from a legacy sqflite database.
         /// Idempotent — skipped if KV flag "sqflite_imported = 1" is set.
         /// <paramref name="oldDbPath"/> must be a null-terminated UTF-8 path.
@@ -635,6 +657,18 @@ namespace WdmmDesktop.Generated
         public static string TrackDelete(string id)
             => WithNativeString(id, wdmm_track_delete);
 
+        /// <summary>Delete all tracks for a given account/source.</summary>
+        public static string TrackDeleteBySource(string accountId)
+            => WithNativeString(accountId, wdmm_track_delete_by_source);
+
+        /// <summary>Clear the entire library (tracks, playlists, manga, CUE sheets).</summary>
+        public static string LibraryClearAll()
+            => wdmm_library_clear_all().ToStringAndFree();
+
+        /// <summary>Clear the library index only (tracks, CUE sheets, deleted_tracks) — preserves playlists and manga.</summary>
+        public static string LibraryClearIndex()
+            => wdmm_library_clear_index().ToStringAndFree();
+
         /// <summary>
         /// One-shot import from a legacy sqflite DB. Returns a JSON summary.
         /// </summary>
@@ -750,6 +784,48 @@ namespace WdmmDesktop.Generated
         public static extern FfiString wdmm_user_folder_remove_item(
             IntPtr folderId, IntPtr refKind, IntPtr refKey);
 
+        // ── CUE Sheets (v5) ───────────────────────────────────────────────────
+        // Requires wdmm_library_init first.
+
+        /// <summary>
+        /// Upsert a CUE album from JSON.
+        /// Expected fields: {id?: i64, account_id, webdav_url, title, artist, album, genre, date, total_tracks}.
+        /// Returns the cue_album_id (i64) or -1 on error.
+        /// <paramref name="json"/> must be a null-terminated UTF-8 JSON string.
+        /// </summary>
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern long wdmm_cue_album_upsert(IntPtr json);
+
+        /// <summary>
+        /// Upsert a CUE slice from JSON.
+        /// Expected fields: {id?: i64, cue_album_id, track_num, title, performer, start_sec, duration_sec}.
+        /// Returns the cue_slice_id (i64) or -1 on error.
+        /// <paramref name="json"/> must be a null-terminated UTF-8 JSON string.
+        /// </summary>
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern long wdmm_cue_slice_upsert(IntPtr json);
+
+        /// <summary>
+        /// Delete a specific CUE slice.
+        /// Returns 0 on success, non-zero on error.
+        /// </summary>
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern int wdmm_cue_slice_delete(long cueAlbumId, int trackNum);
+
+        /// <summary>
+        /// Delete a CUE album and all its slices (CASCADE).
+        /// Returns 0 on success, non-zero on error.
+        /// </summary>
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern int wdmm_cue_album_delete(long cueAlbumId);
+
+        /// <summary>
+        /// List all slices for a CUE album.
+        /// Returns a JSON array string. Caller must free the result.
+        /// </summary>
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern FfiString wdmm_cue_remaining_slices(long cueAlbumId);
+
         // ── Playlists (Core 6a02b3b) ──────────────────────────────────────────
         // Requires wdmm_library_init first.
 
@@ -818,6 +894,50 @@ namespace WdmmDesktop.Generated
         /// <summary>Remove an item by (folderId, refKind, refKey). Returns "ok" or "error:…".</summary>
         public static string UserFolderRemoveItem(string folderId, string refKind, string refKey)
             => WithNativeString3(folderId, refKind, refKey, wdmm_user_folder_remove_item);
+
+        // ── CUE Sheet convenience wrappers ─────────────────────────────────────
+
+        /// <summary>
+        /// Upsert a CUE album from JSON. Returns the cue_album_id (i64) or -1 on error.
+        /// </summary>
+        public static long CueAlbumUpsert(string json)
+        {
+            var bytes = System.Text.Encoding.UTF8.GetBytes(json + '\0');
+            var ptr = Marshal.AllocHGlobal(bytes.Length);
+            try
+            {
+                Marshal.Copy(bytes, 0, ptr, bytes.Length);
+                return wdmm_cue_album_upsert(ptr);
+            }
+            finally { Marshal.FreeHGlobal(ptr); }
+        }
+
+        /// <summary>
+        /// Upsert a CUE slice from JSON. Returns the cue_slice_id (i64) or -1 on error.
+        /// </summary>
+        public static long CueSliceUpsert(string json)
+        {
+            var bytes = System.Text.Encoding.UTF8.GetBytes(json + '\0');
+            var ptr = Marshal.AllocHGlobal(bytes.Length);
+            try
+            {
+                Marshal.Copy(bytes, 0, ptr, bytes.Length);
+                return wdmm_cue_slice_upsert(ptr);
+            }
+            finally { Marshal.FreeHGlobal(ptr); }
+        }
+
+        /// <summary>Delete a specific CUE slice. Returns 0 on success.</summary>
+        public static int CueSliceDelete(long cueAlbumId, int trackNum)
+            => wdmm_cue_slice_delete(cueAlbumId, trackNum);
+
+        /// <summary>Delete a CUE album and all its slices (CASCADE). Returns 0 on success.</summary>
+        public static int CueAlbumDelete(long cueAlbumId)
+            => wdmm_cue_album_delete(cueAlbumId);
+
+        /// <summary>List all slices for a CUE album as a JSON array.</summary>
+        public static string CueRemainingSlices(long cueAlbumId)
+            => wdmm_cue_remaining_slices(cueAlbumId).ToStringAndFree();
 
         // ── Playlist convenience wrappers ──────────────────────────────────────
 
