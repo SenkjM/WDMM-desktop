@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <data name="Nav.Network" xml:space="preserve"><value>文件源</value></data>
+  <data name="Network.Sources" xml:space="preserve"><value>源</value></data>
+  <data name="Network.ManageSources" xml:space="preserve"><value>管理源…</value></data>
+  <data name="Network.Up" xml:space="preserve"><value>上级</value></data>
+  <data name="Network.Refresh" xml:space="preserve"><value>刷新</value></data>
+  <data name="Network.NewFolder" xml:space="preserve"><value>新建文件夹</value></data>
+  <data name="Settings.FileSource" xml:space="preserve"><value>文件源</value></data>
+  <data name="Settings.SyncBackup" xml:space="preserve"><value>同步与备份</value></data>
+  <data name="Settings.SyncNow" xml:space="preserve"><value>立即同步</value></data>
+</root>

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <data name="Nav.Network" xml:space="preserve"><value>File source</value></data>
+  <data name="Network.Sources" xml:space="preserve"><value>Source</value></data>
+  <data name="Network.ManageSources" xml:space="preserve"><value>Manage sources…</value></data>
+  <data name="Network.Up" xml:space="preserve"><value>Up</value></data>
+  <data name="Network.Refresh" xml:space="preserve"><value>Refresh</value></data>
+  <data name="Network.NewFolder" xml:space="preserve"><value>New folder</value></data>
+  <data name="Settings.FileSource" xml:space="preserve"><value>File source</value></data>
+  <data name="Settings.SyncBackup" xml:space="preserve"><value>Sync &amp; backup</value></data>
+  <data name="Settings.SyncNow" xml:space="preserve"><value>Sync now</value></data>
+</root>

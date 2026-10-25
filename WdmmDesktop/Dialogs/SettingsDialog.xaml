@@ -51,7 +51,7 @@
 
                     <RadioButton x:Name="NavHome"      GroupName="SettingsNav" Tag="Home"     IsChecked="True" Checked="SettingsNav_Checked" HorizontalAlignment="Stretch" Content="主页与导航" />
                     <RadioButton x:Name="NavLibrary"   GroupName="SettingsNav" Tag="Library"               Checked="SettingsNav_Checked" HorizontalAlignment="Stretch" Content="媒体库" />
-                    <RadioButton x:Name="NavNetwork2"  GroupName="SettingsNav" Tag="Network2"               Checked="SettingsNav_Checked" HorizontalAlignment="Stretch" Content="网络库" />
+                    <RadioButton x:Name="NavNetwork2"  GroupName="SettingsNav" Tag="Network2"               Checked="SettingsNav_Checked" HorizontalAlignment="Stretch" Content="文件源" />
                     <RadioButton x:Name="NavVideoFile" GroupName="SettingsNav" Tag="VideoFile"              Checked="SettingsNav_Checked" HorizontalAlignment="Stretch" Content="视频/图片/文件" />
                     <RadioButton x:Name="NavMisc"      GroupName="SettingsNav" Tag="Misc"                  Checked="SettingsNav_Checked" HorizontalAlignment="Stretch" Content="杂项" />
                     <RadioButton x:Name="NavSync"      GroupName="SettingsNav" Tag="Sync"                  Checked="SettingsNav_Checked" HorizontalAlignment="Stretch" Content="同步与备份" />
@@ -144,12 +144,12 @@
 
                     <!-- ── Section 3: 网络库 ── -->
                     <StackPanel x:Name="PanelNetwork2" Spacing="16" Visibility="Collapsed">
-                        <TextBlock Style="{StaticResource SectionHeaderStyle}" Text="网络库" />
+                        <TextBlock Style="{StaticResource SectionHeaderStyle}" Text="文件源" />
 
                         <StackPanel Spacing="6">
                             <TextBlock Text="账号" FontSize="12" FontWeight="SemiBold" />
                             <TextBlock Style="{StaticResource HintTextStyle}"
-                                       Text="WebDAV 账号列表显示在「Network」页。在此处仅展示数量；增删请转到 Network 页。" />
+                                       Text="源列表在「文件源」页管理；此处仅展示数量。" />
                             <TextBlock x:Name="AccountCountText" FontSize="12" Opacity="0.7" />
                         </StackPanel>
 
@@ -284,23 +284,18 @@
                         <TextBlock Style="{StaticResource SectionHeaderStyle}" Text="同步与备份" />
 
                         <StackPanel Spacing="6">
-                            <TextBlock Text="同步远端路径" FontSize="12" FontWeight="SemiBold" />
-                            <TextBox x:Name="SyncRemoteDirBox"
-                                     PlaceholderText="WebDAV 远端目录（如 /wdmm-sync）" />
+                            <TextBlock Text="源" FontSize="12" FontWeight="SemiBold" />
+                            <ComboBox x:Name="SyncSourceCombo" HorizontalAlignment="Stretch" />
                             <TextBlock Style="{StaticResource HintTextStyle}"
-                                       Text="账号凭据在 Network 页管理。此处仅填写目标目录。" />
+                                       Text="源在「文件源」页管理；同步使用该源的 WebDAV 凭据。" />
                         </StackPanel>
 
                         <StackPanel Spacing="6">
-                            <TextBlock Text="凭据" FontSize="12" FontWeight="SemiBold" />
-                            <TextBox x:Name="SyncUrlBox"
-                                     PlaceholderText="WebDAV URL（如 https://nas.local/dav）" />
-                            <TextBox x:Name="SyncUserBox"
-                                     PlaceholderText="用户名" />
-                            <PasswordBox x:Name="SyncPassBox"
-                                         PlaceholderText="密码" />
+                            <TextBlock Text="远端路径" FontSize="12" FontWeight="SemiBold" />
+                            <TextBox x:Name="SyncRemoteDirBox"
+                                     PlaceholderText="/wdmm-sync" />
                             <TextBlock Style="{StaticResource HintTextStyle}"
-                                       Text="密码仅保存在本机 LocalStore；不上传到任何云服务。" />
+                                       Text="凭证、歌单与音乐库共用此远端路径（对齐安卓同步与备份）。" />
                         </StackPanel>
 
                         <Button x:Name="TriggerSyncBtn"

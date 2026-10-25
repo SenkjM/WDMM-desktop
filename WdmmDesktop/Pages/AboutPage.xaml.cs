@@ -48,10 +48,9 @@ namespace WdmmDesktop.Pages
                 "Settings   done   — 7 sections; all KV-backed controls live Wave C\n"    +
                 "              Queue concurrency slider live Wave D (Core fdb05df)\n"     +
                 "Tasks      done   — wdmm_queue_status_json / cancel (FFI)\n"             +
-                "Network    part   — account CRUD + sync; last-path session memory\n"     +
+                "File source done — dir browse via wdmm_webdav_*; sources via wdmm_account_*\n"     +
                 "Manga      part   — wdmm_manga_list + progress (FFI, Wave D)\n"          +
-                "              list + detail stub (wdmm_manga_get / list_pages)\n"        +
-                "              upsert/delete UI deferred to Wave E\n"                     +
+                "              list + detail via wdmm_manga_get / list_pages\n"                      +
                 "OpenAPI    opt-in — third-party only (Settings → 第三方/开发者)\n"      +
                 "Local-lib  n/a    — post-Rust-refactor feature; out of scope";
         }

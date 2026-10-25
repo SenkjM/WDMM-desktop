@@ -35,6 +35,7 @@ namespace WdmmDesktop.Dialogs
             LoadFfiState();
             LoadFfiKvSettings();
             LoadAccounts();
+            PopulateSyncSources();
         }
 
         // ── Section switching ──────────────────────────────────────────────────
@@ -151,6 +152,8 @@ namespace WdmmDesktop.Dialogs
             try
             {
                 var locale = SelectedComboTag(LocaleCombo);
+                Loc.ApplyLocale(locale);
+                try { (App.MainWindow as MainWindow)?.ApplyNavLoc(); } catch { }
                 string r;
                 if (!string.IsNullOrEmpty(locale) && locale != "system")
                     r = NativeMethods.KvSet("app_locale", locale);
@@ -191,34 +194,20 @@ namespace WdmmDesktop.Dialogs
 
         private void TriggerSyncBtn_Click(object sender, RoutedEventArgs e)
         {
-            var url  = SyncUrlBox.Text.Trim();
-            var user = SyncUserBox.Text.Trim();
-            var pass = SyncPassBox.Password;
-            var dir  = SyncRemoteDirBox.Text.Trim();
-
-            if (string.IsNullOrEmpty(url) || string.IsNullOrEmpty(dir))
+            var acc = SyncSourceCombo?.SelectedItem as WebDavAccount;
+            var url = acc?.Url?.Trim() ?? "";
+            var user = acc?.Username ?? "";
+            var pass = acc?.Password ?? "";
+            var dir = string.IsNullOrWhiteSpace(SyncRemoteDirBox?.Text) ? "/wdmm-sync" : SyncRemoteDirBox.Text.Trim();
+            if (string.IsNullOrEmpty(url))
             {
-                ShowSyncStatus("填写 WebDAV URL 和远端目录后再同步。", isError: true);
+                ShowInlineStatus(SyncStatusText, "请先在文件源中添加源", isError: true);
                 return;
             }
-
-            // Persist before triggering (best-effort).
-            _prefs.SyncRemoteDir = dir;
-            _prefs.SyncUrl        = url;
-            _prefs.SyncUser       = user;
-            _prefs.SyncPass       = pass;
-            LocalStore.Save(PrefsFile, _prefs);
-
-            ShowSyncStatus("正在触发同步…", isError: false);
-            try
-            {
-                var result = NativeMethods.WithNativeSyncTrigger(url, user, pass, dir);
-                ShowSyncStatus(result.StartsWith("error:") ? result : "同步完成。", isError: result.StartsWith("error:"));
-            }
-            catch (Exception ex)
-            {
-                ShowSyncStatus($"同步失败：{ex.Message}", isError: true);
-            }
+            string result;
+            try { result = NativeMethods.WithNativeSyncTrigger(url, user, pass, dir); }
+            catch (Exception ex) { result = "error:" + ex.Message; }
+            ShowInlineStatus(SyncStatusText, result, isError: result.StartsWith("error:"));
         }
 
         private void ShowSyncStatus(string msg, bool isError)
@@ -244,16 +233,27 @@ namespace WdmmDesktop.Dialogs
             catch { /* FFI not loaded */ }
         }
 
+
+        private void PopulateSyncSources()
+        {
+            if (SyncSourceCombo == null) return;
+            SyncSourceCombo.Items.Clear();
+            foreach (var a in AccountStore.List())
+                SyncSourceCombo.Items.Add(a);
+            SyncSourceCombo.DisplayMemberPath = "DisplayName";
+            if (SyncSourceCombo.Items.Count > 0) SyncSourceCombo.SelectedIndex = 0;
+        }
+
         private void LoadAccounts()
         {
             try
             {
-                var accounts = LocalStore.LoadAccounts();
+                var accounts = AccountStore.List();
                 AccountCountText.Text = accounts.Count == 0
-                    ? "尚未添加账号。"
-                    : $"已配置 {accounts.Count} 个账号。";
+                    ? "尚未添加源。"
+                    : $"已配置 {accounts.Count} 个源。";
             }
-            catch { AccountCountText.Text = "账号信息不可用。"; }
+            catch { AccountCountText.Text = "源信息不可用。"; }
         }
 
         private void StartApiBtn_Click(object sender, RoutedEventArgs e)

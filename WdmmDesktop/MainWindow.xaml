@@ -142,7 +142,7 @@
                                      Style="{StaticResource NavItemStyle}">
                             <StackPanel Orientation="Horizontal" Spacing="12">
                                 <FontIcon Glyph="&#xE968;" FontSize="16" />
-                                <TextBlock x:Name="LblNetwork" Text="Network" VerticalAlignment="Center" />
+                                <TextBlock x:Name="LblNetwork" Text="文件源" VerticalAlignment="Center" />
                             </StackPanel>
                         </RadioButton>
 

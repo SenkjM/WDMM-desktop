@@ -5,138 +5,89 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:local="using:WdmmDesktop.Pages">
 
-    <!-- No Background: Mica shows through -->
-    <Grid>
-        <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="260" MinWidth="0" />
-            <ColumnDefinition Width="*" />
-        </Grid.ColumnDefinitions>
+    <Grid Padding="12,10,12,12" RowSpacing="8">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
 
-        <!-- Left: account list -->
-        <Grid Grid.Column="0">
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="*" />
-                <RowDefinition Height="Auto" />
-            </Grid.RowDefinitions>
-
-            <TextBlock Grid.Row="0"
-                       Text="Accounts"
-                       FontWeight="SemiBold"
-                       FontSize="13"
-                       Margin="14,14,14,6" />
-
-            <ListView x:Name="AccountList"
-                      Grid.Row="1"
-                      SelectionChanged="AccountList_SelectionChanged"
-                      Margin="8,0,8,0">
-                <ListView.ItemTemplate>
-                    <DataTemplate>
-                        <StackPanel Spacing="2" Padding="4,6">
-                            <TextBlock Text="{Binding DisplayName}"
-                                       FontSize="13"
-                                       FontWeight="SemiBold"
-                                       TextTrimming="CharacterEllipsis" />
-                            <TextBlock Text="{Binding Url}"
-                                       FontSize="11"
-                                       Opacity="0.5"
-                                       TextTrimming="CharacterEllipsis" />
-                        </StackPanel>
-                    </DataTemplate>
-                </ListView.ItemTemplate>
-            </ListView>
-
-            <!-- Add / Delete buttons -->
-            <StackPanel Grid.Row="2"
-                        Orientation="Horizontal"
-                        Spacing="6"
-                        Margin="10,6,10,12">
-                <Button x:Name="AddBtn"
-                        Click="AddBtn_Click"
-                        ToolTipService.ToolTip="Add account"
-                        Padding="10,8">
-                    <FontIcon Glyph="&#xE710;" FontSize="14" />
-                </Button>
-                <Button x:Name="DeleteBtn"
-                        Click="DeleteBtn_Click"
-                        IsEnabled="False"
-                        ToolTipService.ToolTip="Remove selected account"
-                        Padding="10,8">
-                    <FontIcon Glyph="&#xE74D;" FontSize="14" />
-                </Button>
+        <!-- Source + actions -->
+        <Grid Grid.Row="0" ColumnSpacing="8">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="220" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <TextBlock x:Name="LblSource" Text="源" VerticalAlignment="Center" Margin="0,0,4,0" />
+            <ComboBox x:Name="SourceCombo"
+                      Grid.Column="1"
+                      HorizontalAlignment="Stretch"
+                      SelectionChanged="SourceCombo_SelectionChanged" />
+            <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="6">
+                <Button x:Name="ManageBtn" Click="ManageBtn_Click" Content="管理源…" Padding="10,6" />
+                <Button x:Name="UpBtn" Click="UpBtn_Click" Content="上级" Padding="10,6" IsEnabled="False" />
+                <Button x:Name="RefreshBtn" Click="RefreshBtn_Click" Content="刷新" Padding="10,6" />
+                <Button x:Name="NewFolderBtn" Click="NewFolderBtn_Click" Content="新建文件夹" Padding="10,6" />
             </StackPanel>
         </Grid>
 
-        <!-- Right: account form + sync -->
-        <ScrollViewer Grid.Column="1" Padding="20,14,20,20">
-            <ContentControl x:Name="FormPanel"
-                            IsEnabled="False"
-                            HorizontalContentAlignment="Stretch"
-                            VerticalContentAlignment="Stretch">
-            <StackPanel Spacing="14"
-                        MaxWidth="420">
+        <!-- Path -->
+        <TextBlock x:Name="PathText"
+                   Grid.Row="1"
+                   FontFamily="Cascadia Mono,Consolas,monospace"
+                   FontSize="12"
+                   Opacity="0.7"
+                   Text="/"
+                   TextWrapping="Wrap" />
 
-                <TextBlock x:Name="FormTitle"
-                           FontSize="15"
-                           FontWeight="SemiBold"
-                           Text="Select or add an account" />
+        <!-- Body -->
+        <Grid Grid.Row="2">
+            <ListView x:Name="EntryList"
+                      DoubleTapped="EntryList_DoubleTapped"
+                      SelectionMode="Single">
+                <ListView.ItemTemplate>
+                    <DataTemplate>
+                        <Grid ColumnSpacing="10" Padding="4,6">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="90" />
+                            </Grid.ColumnDefinitions>
+                            <FontIcon Glyph="{Binding Glyph}" FontSize="16" VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="1"
+                                       Text="{Binding Name}"
+                                       TextTrimming="CharacterEllipsis"
+                                       VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="2"
+                                       Text="{Binding SizeText}"
+                                       Opacity="0.55"
+                                       FontSize="12"
+                                       HorizontalAlignment="Right"
+                                       VerticalAlignment="Center" />
+                        </Grid>
+                    </DataTemplate>
+                </ListView.ItemTemplate>
+                <ListView.ContextFlyout>
+                    <MenuFlyout>
+                        <MenuFlyoutItem x:Name="CtxRename" Text="重命名" Click="CtxRename_Click" />
+                        <MenuFlyoutItem x:Name="CtxDelete" Text="删除" Click="CtxDelete_Click" />
+                    </MenuFlyout>
+                </ListView.ContextFlyout>
+            </ListView>
 
-                <StackPanel Spacing="6">
-                    <TextBlock Text="Display name" FontSize="12" Opacity="0.7" />
-                    <TextBox x:Name="NameBox" PlaceholderText="My NAS" />
-                </StackPanel>
-
-                <StackPanel Spacing="6">
-                    <TextBlock Text="WebDAV URL" FontSize="12" Opacity="0.7" />
-                    <TextBox x:Name="UrlBox"
-                             PlaceholderText="https://nas.local:5006/dav" />
-                </StackPanel>
-
-                <StackPanel Spacing="6">
-                    <TextBlock Text="Username" FontSize="12" Opacity="0.7" />
-                    <TextBox x:Name="UserBox" PlaceholderText="admin" />
-                </StackPanel>
-
-                <StackPanel Spacing="6">
-                    <TextBlock Text="Password" FontSize="12" Opacity="0.7" />
-                    <PasswordBox x:Name="PassBox" />
-                </StackPanel>
-
-                <StackPanel Spacing="6">
-                    <TextBlock Text="Remote directory" FontSize="12" Opacity="0.7" />
-                    <TextBox x:Name="RemoteDirBox"
-                             PlaceholderText="/wdmm" />
-                </StackPanel>
-
-                <!-- Save + Sync row -->
-                <StackPanel Orientation="Horizontal" Spacing="8">
-                    <Button x:Name="SaveBtn"
-                            Click="SaveBtn_Click"
-                            Style="{StaticResource AccentButtonStyle}"
-                            Content="Save"
-                            IsEnabled="False" />
-                    <Button x:Name="SyncBtn"
-                            Click="SyncBtn_Click"
-                            Content="Sync Now"
-                            IsEnabled="False"
-                            ToolTipService.ToolTip="Trigger wdmm_sync_trigger with these credentials" />
-                </StackPanel>
-
-                <!-- Sync result -->
-                <TextBlock x:Name="SyncStatus"
-                           FontSize="12"
-                           TextWrapping="Wrap"
-                           Visibility="Collapsed" />
-
-                <!-- Placeholder note -->
-                <TextBlock FontSize="11"
-                           Opacity="0.4"
-                           TextWrapping="Wrap"
-                           FontFamily="Cascadia Mono,Consolas,monospace"
-                           Text="Account list persisted locally (%LOCALAPPDATA%\Wdmm\accounts.json).&#x0a;TODO: wdmm_account_list / wdmm_account_save not yet in FFI." />
-
+            <StackPanel x:Name="EmptyPanel"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        Spacing="8"
+                        Visibility="Collapsed">
+                <TextBlock x:Name="EmptyText" Text="此文件夹为空" Opacity="0.6" HorizontalAlignment="Center" />
+                <Button x:Name="RetryBtn" Content="重试" Click="RefreshBtn_Click" HorizontalAlignment="Center" Visibility="Collapsed" />
             </StackPanel>
-            </ContentControl>
-        </ScrollViewer>
+
+            <ProgressRing x:Name="BusyRing" Width="36" Height="36" IsActive="False" Visibility="Collapsed"
+                          HorizontalAlignment="Center" VerticalAlignment="Center" />
+        </Grid>
     </Grid>
 </Page>

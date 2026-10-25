@@ -7,6 +7,7 @@ using Microsoft.UI.Xaml.Controls;
 using WdmmDesktop.Dialogs;
 using WdmmDesktop.Generated;
 using WdmmDesktop.Pages;
+using WdmmDesktop.Services;
 
 namespace WdmmDesktop
 {
@@ -43,6 +44,7 @@ namespace WdmmDesktop
             SetupTitleBar();
             SetupFfi();
             CollectNavLabels();
+            ApplyNavLoc();
             CollectNavButtons();
 
             // Start on user-preferred home tab (Settings → 主页与导航), default Folders.
@@ -120,6 +122,25 @@ namespace WdmmDesktop
                 ["Tasks"]     = NavTasks,
                 ["About"]     = NavAbout,
             };
+        }
+
+
+        public void ApplyNavLoc()
+        {
+            try
+            {
+                var tag = NativeMethods.KvGet("app_locale");
+                Loc.ApplyLocale(string.IsNullOrEmpty(tag) || tag.StartsWith("error") ? "system" : tag);
+            }
+            catch { Loc.ApplyLocale("system"); }
+            if (LblFolders != null) LblFolders.Text = Loc.Get("Nav.Folders");
+            if (LblMusic != null) LblMusic.Text = Loc.Get("Nav.Music");
+            if (LblPlaylists != null) LblPlaylists.Text = Loc.Get("Nav.Playlists");
+            if (LblManga != null) LblManga.Text = Loc.Get("Nav.Manga");
+            if (LblNetwork != null) LblNetwork.Text = Loc.Get("Nav.Network");
+            if (LblTasks != null) LblTasks.Text = Loc.Get("Nav.Tasks");
+            if (LblAbout != null) LblAbout.Text = Loc.Get("Nav.About");
+            if (LblSettings != null) LblSettings.Text = Loc.Get("Nav.Settings");
         }
 
         private void ToggleSidebar_Click(object sender, RoutedEventArgs e)

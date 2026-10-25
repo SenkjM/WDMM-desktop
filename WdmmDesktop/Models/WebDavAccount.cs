@@ -1,41 +1,113 @@
 using System;
+using System.Text;
+using System.Text.Json;
 using System.Text.Json.Serialization;
 
 namespace WdmmDesktop.Models
 {
     /// <summary>
-    /// A WebDAV server account used by the Network page.
-    ///
-    /// Account list is persisted locally to %LOCALAPPDATA%\Wdmm\accounts.json because
-    /// wdmm_account_list / wdmm_account_save are not yet in the FFI.
-    /// TODO: replace local persistence with wdmm_account_* once exported.
+    /// A cloud/WebDAV source (product name: 源 / Source).
+    /// Backed by Core <c>wdmm_account_*</c> FFI (credentials stored as UTF-8 JSON bytes in Core DB).
     /// </summary>
     public sealed class WebDavAccount
     {
         [JsonPropertyName("id")]
-        public string Id { get; set; } = Guid.NewGuid().ToString("N")[..8];
+        public string Id { get; set; } = "";
 
-        [JsonPropertyName("name")]
-        public string Name { get; set; } = "";
+        [JsonPropertyName("display_name")]
+        public string DisplayNameField { get; set; } = "";
 
-        [JsonPropertyName("url")]
+        [JsonPropertyName("base_url")]
         public string Url { get; set; } = "";
 
-        [JsonPropertyName("username")]
+        [JsonPropertyName("provider_type")]
+        public string ProviderType { get; set; } = "webdav";
+
+        [JsonIgnore]
         public string Username { get; set; } = "";
 
-        /// <summary>
-        /// Stored in plaintext for now.
-        /// TODO: encrypt with wdmm_crypto_encrypt once a per-machine key strategy is chosen.
-        /// </summary>
-        [JsonPropertyName("password")]
+        [JsonIgnore]
         public string Password { get; set; } = "";
 
-        [JsonPropertyName("remote_dir")]
-        public string RemoteDir { get; set; } = "/wdmm";
+        [JsonIgnore]
+        public string RemoteDir { get; set; } = "/";
+
+        [JsonIgnore]
+        public string Name
+        {
+            get => DisplayNameField;
+            set => DisplayNameField = value;
+        }
 
         [JsonIgnore]
         public string DisplayName =>
-            string.IsNullOrWhiteSpace(Name) ? Url : Name;
+            string.IsNullOrWhiteSpace(DisplayNameField) ? (Url ?? "") : DisplayNameField;
+
+        public static WebDavAccount? FromAccountJson(JsonElement el)
+        {
+            var a = new WebDavAccount
+            {
+                Id = el.TryGetProperty("id", out var id) ? id.GetString() ?? "" : "",
+                DisplayNameField = el.TryGetProperty("display_name", out var dn) ? dn.GetString() ?? "" : "",
+                Url = el.TryGetProperty("base_url", out var bu) ? bu.GetString() ?? "" : "",
+                ProviderType = el.TryGetProperty("provider_type", out var pt) ? pt.GetString() ?? "webdav" : "webdav",
+            };
+            if (el.TryGetProperty("credentials_b64", out var b64El))
+            {
+                var b64 = b64El.GetString();
+                if (!string.IsNullOrEmpty(b64))
+                {
+                    try
+                    {
+                        var bytes = Convert.FromBase64String(b64);
+                        var json = Encoding.UTF8.GetString(bytes);
+                        using var doc = JsonDocument.Parse(json);
+                        var c = doc.RootElement;
+                        if (c.TryGetProperty("username", out var u)) a.Username = u.GetString() ?? "";
+                        if (c.TryGetProperty("password", out var p)) a.Password = p.GetString() ?? "";
+                        if (c.TryGetProperty("remote_dir", out var r)) a.RemoteDir = string.IsNullOrWhiteSpace(r.GetString()) ? "/" : r.GetString()!;
+                    }
+                    catch { /* encrypted or non-JSON credentials — leave blank */ }
+                }
+            }
+            return a;
+        }
+
+        public string ToUpsertJson()
+        {
+            var payload = new
+            {
+                id = string.IsNullOrEmpty(Id) ? null : Id,
+                provider_type = string.IsNullOrEmpty(ProviderType) ? "webdav" : ProviderType,
+                display_name = DisplayNameField ?? "",
+                base_url = Url ?? "",
+                credentials = new
+                {
+                    username = Username ?? "",
+                    password = Password ?? "",
+                    remote_dir = string.IsNullOrWhiteSpace(RemoteDir) ? "/" : RemoteDir
+                }
+            };
+            return JsonSerializer.Serialize(payload);
+        }
+    }
+
+    public sealed class RemoteEntry
+    {
+        public string Name { get; set; } = "";
+        public string Path { get; set; } = "";
+        public bool IsDir { get; set; }
+        public ulong Size { get; set; }
+        public string? Modified { get; set; }
+        public string SizeText => IsDir ? "" : FormatSize(Size);
+        public string Glyph => IsDir ? "\uE8B7" : "\uE8A5"; // Folder / Page
+
+        static string FormatSize(ulong n)
+        {
+            if (n < 1024) return $"{n} B";
+            if (n < 1024 * 1024) return $"{n / 1024.0:0.#} KB";
+            if (n < 1024UL * 1024 * 1024) return $"{n / (1024.0 * 1024):0.#} MB";
+            return $"{n / (1024.0 * 1024 * 1024):0.#} GB";
+        }
     }
 }
