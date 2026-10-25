@@ -160,6 +160,89 @@ namespace WdmmDesktop.Generated
             }
         }
 
+
+        // ── WebDAV browse ─────────────────────────────────────────────────────
+
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern FfiString wdmm_webdav_list(IntPtr webdavUrl, IntPtr webdavUser, IntPtr webdavPass, IntPtr path);
+
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern FfiString wdmm_webdav_mkdir(IntPtr webdavUrl, IntPtr webdavUser, IntPtr webdavPass, IntPtr path);
+
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern FfiString wdmm_webdav_rename(IntPtr webdavUrl, IntPtr webdavUser, IntPtr webdavPass, IntPtr oldPath, IntPtr newPath);
+
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern FfiString wdmm_webdav_remove(IntPtr webdavUrl, IntPtr webdavUser, IntPtr webdavPass, IntPtr path);
+
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern FfiString wdmm_account_list();
+
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern FfiString wdmm_account_get(IntPtr id);
+
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern FfiString wdmm_account_upsert(IntPtr json);
+
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern FfiString wdmm_account_delete(IntPtr id);
+
+        static IntPtr Utf8Z(string s)
+        {
+            var b = System.Text.Encoding.UTF8.GetBytes((s ?? "") + '\0');
+            var p = Marshal.AllocHGlobal(b.Length);
+            Marshal.Copy(b, 0, p, b.Length);
+            return p;
+        }
+
+        public static string WithNativeWebDavList(string url, string user, string pass, string path)
+        {
+            var p1 = Utf8Z(url); var p2 = Utf8Z(user); var p3 = Utf8Z(pass); var p4 = Utf8Z(path);
+            try { return wdmm_webdav_list(p1, p2, p3, p4).ToStringAndFree(); }
+            finally { Marshal.FreeHGlobal(p1); Marshal.FreeHGlobal(p2); Marshal.FreeHGlobal(p3); Marshal.FreeHGlobal(p4); }
+        }
+
+        public static string WithNativeWebDavMkdir(string url, string user, string pass, string path)
+        {
+            var p1 = Utf8Z(url); var p2 = Utf8Z(user); var p3 = Utf8Z(pass); var p4 = Utf8Z(path);
+            try { return wdmm_webdav_mkdir(p1, p2, p3, p4).ToStringAndFree(); }
+            finally { Marshal.FreeHGlobal(p1); Marshal.FreeHGlobal(p2); Marshal.FreeHGlobal(p3); Marshal.FreeHGlobal(p4); }
+        }
+
+        public static string WithNativeWebDavRename(string url, string user, string pass, string oldPath, string newPath)
+        {
+            var p1 = Utf8Z(url); var p2 = Utf8Z(user); var p3 = Utf8Z(pass); var p4 = Utf8Z(oldPath); var p5 = Utf8Z(newPath);
+            try { return wdmm_webdav_rename(p1, p2, p3, p4, p5).ToStringAndFree(); }
+            finally { Marshal.FreeHGlobal(p1); Marshal.FreeHGlobal(p2); Marshal.FreeHGlobal(p3); Marshal.FreeHGlobal(p4); Marshal.FreeHGlobal(p5); }
+        }
+
+        public static string WithNativeWebDavRemove(string url, string user, string pass, string path)
+        {
+            var p1 = Utf8Z(url); var p2 = Utf8Z(user); var p3 = Utf8Z(pass); var p4 = Utf8Z(path);
+            try { return wdmm_webdav_remove(p1, p2, p3, p4).ToStringAndFree(); }
+            finally { Marshal.FreeHGlobal(p1); Marshal.FreeHGlobal(p2); Marshal.FreeHGlobal(p3); Marshal.FreeHGlobal(p4); }
+        }
+
+        public static string WithNativeAccountList()
+        {
+            try { return wdmm_account_list().ToStringAndFree(); }
+            catch { return "error:ffi_unavailable"; }
+        }
+
+        public static string WithNativeAccountUpsert(string json)
+        {
+            var p = Utf8Z(json);
+            try { return wdmm_account_upsert(p).ToStringAndFree(); }
+            finally { Marshal.FreeHGlobal(p); }
+        }
+
+        public static string WithNativeAccountDelete(string id)
+        {
+            var p = Utf8Z(id);
+            try { return wdmm_account_delete(p).ToStringAndFree(); }
+            finally { Marshal.FreeHGlobal(p); }
+        }
+
         // ── DLNA (Round 4) ────────────────────────────────────────────────────
 
         /// <summary>
