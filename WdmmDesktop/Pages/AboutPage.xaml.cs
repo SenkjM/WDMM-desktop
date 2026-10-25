@@ -49,7 +49,8 @@ namespace WdmmDesktop.Pages
                 "              Queue concurrency slider live Wave D (Core fdb05df)\n"     +
                 "Tasks      done   — wdmm_queue_status_json / cancel (FFI)\n"             +
                 "File source done — dir browse via wdmm_webdav_*; sources via wdmm_account_*\n"     +
-                "Manga      part   — wdmm_manga_list + progress (FFI, Wave D)\n"          +
+                "Settings   done   — TabView; Sync KV Android-shaped + sync_trigger\n" +
+                "Manga      done   — list/get/pages + upsert/set_progress/delete (FFI)\n" +
                 "              list + detail via wdmm_manga_get / list_pages\n"                      +
                 "OpenAPI    opt-in — third-party only (Settings → 第三方/开发者)\n"      +
                 "Local-lib  n/a    — post-Rust-refactor feature; out of scope";

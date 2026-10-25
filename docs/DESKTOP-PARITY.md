@@ -39,12 +39,12 @@ Chrome rules are unchanged from the shell demo:
 |-------------|--------|-------|
 | **Folders** | partial | Local directory browser. Remote WebDAV browse lives on **File source** page (`wdmm_webdav_*`), not Folders. |
 | **Music** | **real** | Track list from `wdmm_track_list()`. AutoSuggestBox search via `wdmm_track_search()`. Cast button hands off track to CastPage via `AppState.PendingCastTrack`. |
-| **Playlists** | **OpenAPI bridge** | `GET/POST/DELETE /v1/playlists` + `GET /v1/playlists/:id/entries` via HttpClient when server running. InfoBar guard when OpenAPI down. Direct FFI `wdmm_playlist_list` not exported @ d8b2217. |
-| **Manga** | stub | BLOCKED — `wdmm_manga_list` / chapter APIs not in FFI or OpenAPI @ d8b2217 (storage tables `manga_series`/`manga_chapters` exist; no CRUD yet). Rich library-shaped page with always-open InfoBar naming missing APIs. |
+| **Playlists** | **real (FFI)** | `wdmm_playlist_*` NativeMethods wired; OpenAPI bridge remains for third-party. |
+| **Manga** | **real** | `wdmm_manga_list` / `_get` / `_list_pages` / `_list_progress` read; detail dialog writes via `wdmm_manga_upsert` / `_set_progress` / `_delete`. |
 | **File source (Network)** | **real** | Directory browse via `wdmm_webdav_list/mkdir/rename/remove`; sources via `wdmm_account_*`; remember-path settings FFI; Settings sync uses selected source + `wdmm_sync_trigger`. i18n zh/en via Loc + Resources.resw. |
 | **Tasks** | **real** | Queue list from `wdmm_queue_status_json()`. Pending count badge. Per-task cancel via `wdmm_queue_cancel`. |
 | **Cast / DLNA** | **real** | DMR discovery via `wdmm_dlna_discover_json(2000 ms)`. USN-keyed compat prefs persisted to `%LOCALAPPDATA%\Wdmm\dmr_prefs.json`. Proxy-only cast enforced. Single-file mutex (HLS tokens via `ProxyUnregisterHls`, file tokens via `ProxyUnregister`). HLS: **unlocked** — `ProxyRegisterHls(device_id: Usn, filePath)` (wdmm-core e236ece). LocalFile→register_file or register_hls. LocalStream hook prepared — refuses until cloud/crypt drivers exist. NetworkDirect refuses (cache first). No silent HLS↔direct fallback. `ContentDeliveryKind` model wired. |
-| **Settings** | **real** | Sync & backup: pick 源 + remote path + `wdmm_sync_trigger`. OpenAPI start/stop/token. Locale via Loc/`app_locale`. File-source remember-path settings FFI. |
+| **Settings** | **real** | TabView chrome (920×640). Sync & backup Android-shaped: `sync_remote_root` / `sync_interval` / `playlist_sync_enabled` / `sync_encrypt_password` KV + `wdmm_sync_trigger` (no backup archive — no FFI). Sources via `wdmm_account_*`. Library `media_scan_*`. OpenAPI third-party only. |
 | **About** | **real** | `wdmm_version()`, OpenAPI running status + port, parity matrix summary. |
 
 ---
@@ -194,7 +194,7 @@ dotnet build -c Debug
 | `WdmmDesktop/Pages/FoldersPage.xaml/.cs` | **UPDATED** — source toggle (Local/Remote), WebDAV blocked InfoBar, empty/error states |
 | `WdmmDesktop/Pages/MusicPage.xaml/.cs` | Track list + search (real FFI); Cast button |
 | `WdmmDesktop/Pages/PlaylistsPage.xaml/.cs` | **UPDATED** — full OpenAPI bridge; two-pane list+entries; create/delete dialogs |
-| `WdmmDesktop/Pages/MangaPage.xaml/.cs` | **UPDATED** — rich library-shaped stub; always-open blocked InfoBar |
+| `WdmmDesktop/Pages/MangaPage.xaml/.cs` | **UPDATED** — list + detail write (upsert/progress/delete) via manga FFI |
 | `WdmmDesktop/Pages/NetworkPage.xaml/.cs` | File source directory browser (`wdmm_webdav_*` + `wdmm_account_*`); Loc i18n |
 | `WdmmDesktop/Pages/TasksPage.xaml/.cs` | Queue list + cancel (real FFI) |
 | `WdmmDesktop/Pages/CastPage.xaml/.cs` | DLNA discovery + proxy cast; locked rules enforced |
@@ -223,3 +223,11 @@ dotnet build -c Debug
 | LocalStream cast (`wdmm_proxy_register_stream`) | Bindings + hook present; needs desktop cloud/crypt driver |
 | Sidebar animation | Polish (DoubleAnimation on SidebarColumn.Width) — not parity-blocking |
 | Sidebar state persistence | Persist last destination + expand/collapse across launches |
+
+---
+
+## Settings / Account FFI (2026-10-25)
+
+- Core `be6565a`: `wdmm_account_*` CRUD; `wdmm_sync_trigger` uses global library DB (not `:memory:`).
+- Desktop: AccountStore + migrate off `accounts.json`; Settings TabView; Sync KV keys aligned with Android `sync_screen.dart`; Manga write UI.
+- Still deferred: backup archive FFI, local-lib folder mount extras, DMR prefs Core store (local `dmr_prefs.json` until merged).
