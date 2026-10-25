@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text.Json;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -66,6 +67,7 @@ namespace WdmmDesktop.Pages
             // Clear detail pane.
             _selectedPlaylistId = null;
             DeleteBtn.IsEnabled = false;
+            EntryToolbar.Visibility = Visibility.Collapsed;
             EntryList.Items.Clear();
             EntryEmptyState.Visibility = Visibility.Collapsed;
             UpdateDetailTitle(null);
@@ -118,6 +120,7 @@ namespace WdmmDesktop.Pages
             if (PlaylistList.SelectedItem is not PlaylistItem pl) return;
             _selectedPlaylistId = pl.Id;
             DeleteBtn.IsEnabled = true;
+            EntryToolbar.Visibility = Visibility.Visible;
             LoadEntries(pl.Id, pl.Name);
         }
 
@@ -192,6 +195,166 @@ namespace WdmmDesktop.Pages
             catch (Exception ex)
             {
                 StatusBar.Text = $"Delete failed ({ex.Message}).";
+            }
+        }
+
+        // ── Entry editing: add / remove / reorder (persisted via set_entries) ───
+
+        private async void AddEntryBtn_Click(object sender, RoutedEventArgs e)
+        {
+            if (string.IsNullOrEmpty(_selectedPlaylistId)) return;
+
+            // Load library tracks for the picker.
+            var tracks = new List<TrackItem>();
+            try
+            {
+                var json = NativeMethods.TrackList();
+                if (!json.StartsWith("error:"))
+                    tracks = JsonSerializer.Deserialize<List<TrackItem>>(json) ?? new();
+            }
+            catch { /* FFI not loaded */ }
+
+            var searchBox = new TextBox
+            {
+                PlaceholderText = "Search tracks…",
+                MinWidth        = 340
+            };
+            var resultList = new ListView
+            {
+                MinHeight     = 300,
+                SelectionMode = ListViewSelectionMode.Single
+            };
+            foreach (var t in tracks.OrderBy(x => x.Title))
+                resultList.Items.Add(t);
+
+            searchBox.TextChanged += (_, _) =>
+            {
+                var q = searchBox.Text.Trim();
+                resultList.Items.Clear();
+                foreach (var t in tracks)
+                    if (q.Length == 0 || t.Title.Contains(q, StringComparison.OrdinalIgnoreCase)
+                                       || t.Artist.Contains(q, StringComparison.OrdinalIgnoreCase))
+                        resultList.Items.Add(t);
+            };
+
+            var panel = new StackPanel { Spacing = 8 };
+            panel.Children.Add(searchBox);
+            panel.Children.Add(resultList);
+
+            var dlg = new ContentDialog
+            {
+                Title             = "Add track to playlist",
+                Content           = panel,
+                PrimaryButtonText = "Add",
+                CloseButtonText   = "Cancel",
+                XamlRoot          = XamlRoot
+            };
+            if (await dlg.ShowAsync() != ContentDialogResult.Primary) return;
+            if (resultList.SelectedItem is not TrackItem picked) return;
+
+            // Append a new entry derived from the picked track.
+            var entries = EntryList.Items.OfType<PlaylistEntryItem>().ToList();
+            var newEntry = new PlaylistEntryItem
+            {
+                PlaylistId  = _selectedPlaylistId,
+                Position    = entries.Count,
+                MusicId     = picked.Id,
+                SourceName  = "library",
+                RemotePath  = picked.Path,
+                Title       = picked.Title,
+                DurationMs  = 0
+            };
+            entries.Add(newEntry);
+
+            if (PersistEntries(entries))
+            {
+                EntryList.Items.Clear();
+                foreach (var en in entries) EntryList.Items.Add(en);
+                EntryEmptyState.Visibility = entries.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+            }
+        }
+
+        private void RemoveEntryBtn_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not Button btn || btn.Tag is not PlaylistEntryItem row) return;
+            if (string.IsNullOrEmpty(_selectedPlaylistId)) return;
+
+            var entries = EntryList.Items.OfType<PlaylistEntryItem>()
+                .Where(en => en.MusicId != row.MusicId || en.Position != row.Position)
+                .ToList();
+
+            if (PersistEntries(entries))
+            {
+                EntryList.Items.Clear();
+                foreach (var en in entries) EntryList.Items.Add(en);
+                if (entries.Count == 0)
+                {
+                    EntryEmptyState.Visibility = Visibility.Visible;
+                    EntryEmptyText.Text = "No entries in this playlist.";
+                }
+            }
+        }
+
+        private void MoveEntryUpBtn_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not Button btn || btn.Tag is not PlaylistEntryItem row) return;
+            ReorderEntry(row, -1);
+        }
+
+        private void MoveEntryDownBtn_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not Button btn || btn.Tag is not PlaylistEntryItem row) return;
+            ReorderEntry(row, +1);
+        }
+
+        private void ReorderEntry(PlaylistEntryItem row, int delta)
+        {
+            var entries = EntryList.Items.OfType<PlaylistEntryItem>().ToList();
+            var idx = entries.FindIndex(en => en.MusicId == row.MusicId && en.Position == row.Position);
+            if (idx < 0) return;
+            var newIdx = idx + delta;
+            if (newIdx < 0 || newIdx >= entries.Count) return;
+
+            (entries[idx], entries[newIdx]) = (entries[newIdx], entries[idx]);
+            if (PersistEntries(entries))
+            {
+                EntryList.Items.Clear();
+                foreach (var en in entries) EntryList.Items.Add(en);
+            }
+        }
+
+        /// <summary>
+        /// Serialize the current entry list and persist it via wdmm_playlist_set_entries.
+        /// Reindexes Position to a contiguous 0-based sequence. Returns true on success.
+        /// </summary>
+        private bool PersistEntries(List<PlaylistEntryItem> entries)
+        {
+            for (int i = 0; i < entries.Count; i++)
+                entries[i].Position = i;
+
+            var parts = entries.Select(en =>
+                $"{{\"music_id\":\"{EscapeJson(en.MusicId)}\","          +
+                $"\"source_name\":\"{EscapeJson(en.SourceName)}\","      +
+                $"\"remote_path\":\"{EscapeJson(en.RemotePath)}\","      +
+                $"\"title\":\"{EscapeJson(en.Title)}\","                  +
+                $"\"duration_ms\":{en.DurationMs}}}");
+            var jsonArray = $"[{string.Join(",", parts)}]";
+
+            try
+            {
+                var result = NativeMethods.PlaylistSetEntries(_selectedPlaylistId!, jsonArray);
+                if (result.StartsWith("error:"))
+                {
+                    StatusBar.Text = result;
+                    return false;
+                }
+                StatusBar.Text = $"Saved ({entries.Count} entries).";
+                return true;
+            }
+            catch (Exception ex)
+            {
+                StatusBar.Text = $"Save failed: {ex.Message}";
+                return false;
             }
         }
 

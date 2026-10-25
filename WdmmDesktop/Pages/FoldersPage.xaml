@@ -19,14 +19,27 @@
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
             <TextBlock Grid.Column="0"
                        Text="我的文件夹"
                        FontSize="15"
                        FontWeight="SemiBold"
                        VerticalAlignment="Center" />
-            <Button x:Name="NewFolderBtn"
+            <!-- Add Item: append a track / album / artist ref to the current folder -->
+            <Button x:Name="AddItemBtn"
                     Grid.Column="1"
+                    Click="AddItemBtn_Click"
+                    ToolTipService.ToolTip="Add item to folder"
+                    Margin="0,0,6,0"
+                    Padding="10,7">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <FontIcon Glyph="&#xE8F4;" FontSize="13" />
+                    <TextBlock Text="Add item" FontSize="12" />
+                </StackPanel>
+            </Button>
+            <Button x:Name="NewFolderBtn"
+                    Grid.Column="2"
                     Click="NewFolderBtn_Click"
                     ToolTipService.ToolTip="New folder"
                     Padding="10,7">
@@ -79,6 +92,7 @@
                                         Orientation="Horizontal"
                                         Spacing="4"
                                         VerticalAlignment="Center">
+                                <!-- Folder actions: rename / delete (visible on FolderDisplayRow) -->
                                 <Button Click="RenameBtn_Click"
                                         Tag="{Binding}"
                                         Background="Transparent"
@@ -94,6 +108,34 @@
                                         BorderThickness="0"
                                         Visibility="{Binding IsFolder, Converter={StaticResource BoolToVisibilityConverter}}"
                                         ToolTipService.ToolTip="Delete folder"
+                                        Padding="7,5">
+                                    <FontIcon Glyph="&#xE74D;" FontSize="13" />
+                                </Button>
+                                <!-- Item actions: move up / move down / remove (visible on ItemDisplayRow) -->
+                                <Button Click="MoveItemUpBtn_Click"
+                                        Tag="{Binding}"
+                                        Background="Transparent"
+                                        BorderThickness="0"
+                                        Visibility="{Binding IsItem, Converter={StaticResource BoolToVisibilityConverter}}"
+                                        ToolTipService.ToolTip="Move up"
+                                        Padding="7,5">
+                                    <FontIcon Glyph="&#xE70E;" FontSize="12" />
+                                </Button>
+                                <Button Click="MoveItemDownBtn_Click"
+                                        Tag="{Binding}"
+                                        Background="Transparent"
+                                        BorderThickness="0"
+                                        Visibility="{Binding IsItem, Converter={StaticResource BoolToVisibilityConverter}}"
+                                        ToolTipService.ToolTip="Move down"
+                                        Padding="7,5">
+                                    <FontIcon Glyph="&#xE70D;" FontSize="12" />
+                                </Button>
+                                <Button Click="RemoveItemBtn_Click"
+                                        Tag="{Binding}"
+                                        Background="Transparent"
+                                        BorderThickness="0"
+                                        Visibility="{Binding IsItem, Converter={StaticResource BoolToVisibilityConverter}}"
+                                        ToolTipService.ToolTip="Remove item"
                                         Padding="7,5">
                                     <FontIcon Glyph="&#xE74D;" FontSize="13" />
                                 </Button>

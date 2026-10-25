@@ -82,12 +82,35 @@
                 <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
 
-            <TextBlock x:Name="DetailTitle"
-                       Grid.Row="0"
-                       Text="Select a playlist"
-                       FontSize="15"
-                       FontWeight="SemiBold"
-                       Margin="20,14,20,6" />
+            <!-- Right pane header: title + entry action toolbar -->
+            <Grid Grid.Row="0" Margin="20,14,12,6">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock x:Name="DetailTitle"
+                           Grid.Column="0"
+                           Text="Select a playlist"
+                           FontSize="15"
+                           FontWeight="SemiBold"
+                           VerticalAlignment="Center" />
+                <!-- Entry edit actions — enabled only when a playlist is selected -->
+                <StackPanel x:Name="EntryToolbar"
+                            Grid.Column="1"
+                            Orientation="Horizontal"
+                            Spacing="4"
+                            Visibility="Collapsed">
+                    <Button x:Name="AddEntryBtn"
+                            Click="AddEntryBtn_Click"
+                            ToolTipService.ToolTip="Add track to playlist"
+                            Padding="10,7">
+                        <StackPanel Orientation="Horizontal" Spacing="5">
+                            <FontIcon Glyph="&#xE8F4;" FontSize="13" />
+                            <TextBlock Text="Add track" FontSize="12" />
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
+            </Grid>
 
             <ListView x:Name="EntryList"
                       Grid.Row="1"
@@ -99,6 +122,7 @@
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
                             <TextBlock Grid.Column="0"
@@ -124,6 +148,36 @@
                                        Opacity="0.5"
                                        VerticalAlignment="Center"
                                        FontFamily="Cascadia Mono,Consolas,monospace" />
+                            <!-- Entry reorder / remove actions -->
+                            <StackPanel Grid.Column="3"
+                                        Orientation="Horizontal"
+                                        Spacing="2"
+                                        VerticalAlignment="Center">
+                                <Button Click="MoveEntryUpBtn_Click"
+                                        Tag="{Binding}"
+                                        Background="Transparent"
+                                        BorderThickness="0"
+                                        ToolTipService.ToolTip="Move up"
+                                        Padding="6,4">
+                                    <FontIcon Glyph="&#xE70E;" FontSize="12" />
+                                </Button>
+                                <Button Click="MoveEntryDownBtn_Click"
+                                        Tag="{Binding}"
+                                        Background="Transparent"
+                                        BorderThickness="0"
+                                        ToolTipService.ToolTip="Move down"
+                                        Padding="6,4">
+                                    <FontIcon Glyph="&#xE70D;" FontSize="12" />
+                                </Button>
+                                <Button Click="RemoveEntryBtn_Click"
+                                        Tag="{Binding}"
+                                        Background="Transparent"
+                                        BorderThickness="0"
+                                        ToolTipService.ToolTip="Remove from playlist"
+                                        Padding="6,4">
+                                    <FontIcon Glyph="&#xE74D;" FontSize="12" />
+                                </Button>
+                            </StackPanel>
                         </Grid>
                     </DataTemplate>
                 </ListView.ItemTemplate>

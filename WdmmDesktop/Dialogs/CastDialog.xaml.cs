@@ -17,7 +17,8 @@ namespace WdmmDesktop.Dialogs
     /// </summary>
     public sealed partial class CastDialog : ContentDialog
     {
-        // Single-file mutex (shared with CastPage static state when both exist).
+        // Single-file mutex: track the active cast token across all operations.
+        // CastPage was removed in Wave C — this dialog is the sole owner.
         private static string? _activeProxyToken;
         private static bool    _activeTokenIsHls;
 

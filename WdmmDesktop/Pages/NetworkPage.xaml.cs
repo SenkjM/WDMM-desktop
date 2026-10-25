@@ -16,6 +16,8 @@ namespace WdmmDesktop.Pages
         private List<WebDavAccount> _accounts = new();
         private WebDavAccount? _selected;
         private bool _isNew;
+        // Cached last network path, restored from Core FFI when RememberNetworkPath is on.
+        private string? _lastPath;
 
         public NetworkPage() => InitializeComponent();
 
@@ -23,6 +25,22 @@ namespace WdmmDesktop.Pages
         {
             base.OnNavigatedTo(e);
             LoadAccounts();
+            RestoreLastPath();
+        }
+
+        /// <summary>
+        /// If RememberNetworkPath is set in Core, load the last used remote dir
+        /// so it can be offered as the default when the user creates a new account.
+        /// </summary>
+        private void RestoreLastPath()
+        {
+            try
+            {
+                if (!NativeMethods.SettingsGetNetworkRememberLastPath()) return;
+                var path = NativeMethods.SettingsGetNetworkLastPath();
+                if (!string.IsNullOrEmpty(path)) _lastPath = path;
+            }
+            catch { /* FFI not loaded */ }
         }
 
         // ── Account list ──────────────────────────────────────────────────────
@@ -50,7 +68,9 @@ namespace WdmmDesktop.Pages
             _selected = null;
             _isNew = true;
             AccountList.SelectedItem = null;
-            PopulateForm(new WebDavAccount { RemoteDir = "/wdmm" });
+            // Pre-fill RemoteDir with the last remembered path when available.
+            var defaultDir = !string.IsNullOrEmpty(_lastPath) ? _lastPath : "/wdmm";
+            PopulateForm(new WebDavAccount { RemoteDir = defaultDir });
         }
 
         private void DeleteBtn_Click(object sender, RoutedEventArgs e)
@@ -155,8 +175,18 @@ namespace WdmmDesktop.Pages
                     ptrs => NativeMethods.wdmm_sync_trigger(ptrs[0], ptrs[1], ptrs[2], ptrs[3])
                            .ToStringAndFree());
 
-                ShowSyncStatus(result.StartsWith("error:") ? result : $"Sync complete: {result}",
-                               isError: result.StartsWith("error:"));
+                var isErr = result.StartsWith("error:");
+                ShowSyncStatus(isErr ? result : $"Sync complete: {result}",
+                               isError: isErr);
+
+                // On success, persist the remote dir as the last network path so
+                // NetworkPage can restore it next session (when RememberNetworkPath is on).
+                if (!isErr)
+                {
+                    try { NativeMethods.SettingsSetNetworkLastPath(remDir); }
+                    catch { /* FFI not loaded */ }
+                    _lastPath = remDir;
+                }
             }
             catch (Exception ex)
             {

@@ -834,5 +834,90 @@ namespace WdmmDesktop.Generated
                 wdmm_proxy_stream_set_result(requestId, IntPtr.Zero, 0, status < 0 ? status : -1);
             }
         }
+
+        // ── KV store (Wave C) ────────────────────────────────────────────────
+
+        /// <summary>Get a KV value by key. Returns value string or "" if not found. Caller must free.</summary>
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern FfiString wdmm_kv_get(IntPtr key);
+
+        /// <summary>Set a KV key to value. Returns "ok" or "error:…". Caller must free.</summary>
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern FfiString wdmm_kv_set(IntPtr key, IntPtr value);
+
+        /// <summary>Delete a KV key. Returns "ok". Caller must free.</summary>
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern FfiString wdmm_kv_delete(IntPtr key);
+
+        // ── Settings: network path (Wave C) ──────────────────────────────────
+
+        /// <summary>Returns 1 if remember-last-network-path is enabled, 0 otherwise.</summary>
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern int wdmm_settings_get_network_remember_last_path();
+
+        /// <summary>Enable/disable remember-last-network-path (value=1/0). Returns "ok". Caller must free.</summary>
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern FfiString wdmm_settings_set_network_remember_last_path(int value);
+
+        /// <summary>Get session-only last network path. Returns "" if not set. Caller must free.</summary>
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern FfiString wdmm_settings_get_network_last_path();
+
+        /// <summary>Set session-only last network path. Returns "ok". Caller must free.</summary>
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern FfiString wdmm_settings_set_network_last_path(IntPtr path);
+
+        // ── User folder set_items (Wave C) ───────────────────────────────────
+
+        /// <summary>
+        /// Atomically replace all items in a folder.
+        /// jsonArray: JSON array of {folder_id, ref_kind, ref_key, sort_order}.
+        /// Returns "ok" or "error:…". Caller must free.
+        /// </summary>
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern FfiString wdmm_user_folder_set_items(IntPtr folderId, IntPtr jsonArray);
+
+        // ── Wave C convenience wrappers ───────────────────────────────────────
+
+        /// <summary>Get a KV value. Returns value string, "" if not found, or "error:…".</summary>
+        public static string KvGet(string key)
+            => WithNativeString(key, wdmm_kv_get);
+
+        /// <summary>Set a KV key/value pair. Returns "ok" or "error:…".</summary>
+        public static string KvSet(string key, string value)
+            => WithNativeString2(key, value, wdmm_kv_set);
+
+        /// <summary>Delete a KV key. Returns "ok".</summary>
+        public static string KvDelete(string key)
+            => WithNativeString(key, wdmm_kv_delete);
+
+        /// <summary>Returns true if remember-last-network-path is enabled in Core settings.</summary>
+        public static bool SettingsGetNetworkRememberLastPath()
+        {
+            try { return wdmm_settings_get_network_remember_last_path() == 1; }
+            catch { return false; }
+        }
+
+        /// <summary>Enable or disable remember-last-network-path. Returns "ok" or "error:…".</summary>
+        public static string SettingsSetNetworkRememberLastPath(bool enabled)
+        {
+            try { return wdmm_settings_set_network_remember_last_path(enabled ? 1 : 0).ToStringAndFree(); }
+            catch (Exception ex) { return $"error: {ex.Message}"; }
+        }
+
+        /// <summary>Get the session-only last network path. Returns "" if not set.</summary>
+        public static string SettingsGetNetworkLastPath()
+        {
+            try { return wdmm_settings_get_network_last_path().ToStringAndFree(); }
+            catch { return ""; }
+        }
+
+        /// <summary>Set the session-only last network path (never persisted to disk).</summary>
+        public static string SettingsSetNetworkLastPath(string path)
+            => WithNativeString(path, wdmm_settings_set_network_last_path);
+
+        /// <summary>Atomically replace all items in a folder. jsonArray is a JSON array of item objects.</summary>
+        public static string UserFolderSetItems(string folderId, string jsonArray)
+            => WithNativeString2(folderId, jsonArray, wdmm_user_folder_set_items);
     }
 }

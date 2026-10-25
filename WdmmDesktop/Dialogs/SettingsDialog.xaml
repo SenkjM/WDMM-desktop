@@ -105,16 +105,41 @@
                     <StackPanel x:Name="PanelLibrary" Spacing="16" Visibility="Collapsed">
                         <TextBlock Style="{StaticResource SectionHeaderStyle}" Text="媒体库" />
                         <InfoBar IsOpen="True" IsClosable="False" Severity="Informational"
-                                 Title="待 FFI"
-                                 Message="媒体库设置需要 wdmm_library_settings_* FFI（Core 重构后提供）。当前媒体库读写通过 wdmm_track_list / wdmm_library_init 完成。" />
-                        <StackPanel Spacing="6">
-                            <TextBlock Text="媒体库路径" FontSize="12" />
-                            <TextBox IsEnabled="False" PlaceholderText="（待 FFI 提供设置接口）" />
+                                 Title="KV-backed (Wave C)"
+                                 Message="以下设置通过 wdmm_kv_* 写入 Core KV，重启后生效。媒体库读写本身仍走 wdmm_track_list / wdmm_library_init。" />
+
+                        <StackPanel Spacing="10">
+                            <TextBlock Text="扫描选项" FontSize="12" FontWeight="SemiBold" />
+                            <ToggleSwitch x:Name="ScanRecursiveToggle"
+                                          Header="递归扫描子目录"
+                                          MinWidth="0" />
+                            <StackPanel Spacing="4">
+                                <TextBlock Text="最大扫描深度" FontSize="12" />
+                                <NumberBox x:Name="ScanDepthBox"
+                                           Minimum="1" Maximum="32" Value="5"
+                                           SpinButtonPlacementMode="Compact" />
+                            </StackPanel>
                         </StackPanel>
-                        <StackPanel Spacing="6">
-                            <TextBlock Text="漫画库路径" FontSize="12" />
-                            <TextBox IsEnabled="False" PlaceholderText="（待 FFI 提供漫画 API）" />
+
+                        <StackPanel Spacing="10">
+                            <TextBlock Text="媒体类型" FontSize="12" FontWeight="SemiBold" />
+                            <ToggleSwitch x:Name="ScanAudioToggle"
+                                          Header="扫描音频文件"
+                                          MinWidth="0" />
+                            <ToggleSwitch x:Name="ScanVideoToggle"
+                                          Header="扫描视频文件"
+                                          MinWidth="0" />
+                            <ToggleSwitch x:Name="ScanMangaToggle"
+                                          Header="扫描漫画/图片"
+                                          MinWidth="0" />
                         </StackPanel>
+
+                        <Button x:Name="SaveLibraryBtn"
+                                Click="SaveLibraryBtn_Click"
+                                Content="保存"
+                                Style="{StaticResource AccentButtonStyle}"
+                                Padding="16,8" />
+                        <TextBlock x:Name="LibraryStatusText" FontSize="11" Visibility="Collapsed" />
                     </StackPanel>
 
                     <!-- ── Section 3: 网络库 ── -->
@@ -132,33 +157,73 @@
                             <TextBlock Text="下载队列设置" FontSize="12" FontWeight="SemiBold" />
                             <TextBox IsEnabled="False" PlaceholderText="最大并发数（待 FFI）" />
                             <TextBlock Style="{StaticResource HintTextStyle}"
-                                       Text="待 FFI：wdmm_queue_set_concurrency 未导出。" />
+                                       Text="待 FFI：wdmm_queue_set_concurrency 未导出，此项保持禁用。" />
                         </StackPanel>
 
-                        <StackPanel Spacing="6">
+                        <StackPanel Spacing="10">
                             <TextBlock Text="传输加密" FontSize="12" FontWeight="SemiBold" />
-                            <ToggleSwitch IsEnabled="False"
-                                          Header="启用 AES-256-GCM 加密（待 FFI）"
+                            <ToggleSwitch x:Name="CryptSequentialDownloadToggle"
+                                          Header="顺序下载加密（AES-256-GCM）"
                                           MinWidth="0" />
-                            <TextBlock Style="{StaticResource HintTextStyle}"
-                                       Text="待 FFI：加密密钥管理 API 未导出。" />
+                            <ToggleSwitch x:Name="PreferLibsodiumToggle"
+                                          Header="优先使用 libsodium secretbox"
+                                          MinWidth="0" />
                         </StackPanel>
+
+                        <StackPanel Spacing="10">
+                            <TextBlock Text="分片下载" FontSize="12" FontWeight="SemiBold" />
+                            <StackPanel Spacing="4">
+                                <TextBlock Text="分片大小（字节，0 = 禁用）" FontSize="12" />
+                                <TextBox x:Name="DownloadPartSizeBox"
+                                         PlaceholderText="例如 10485760" />
+                            </StackPanel>
+                            <StackPanel Spacing="4">
+                                <TextBlock Text="分片数量（0 = 禁用）" FontSize="12" />
+                                <TextBox x:Name="DownloadPartCountBox"
+                                         PlaceholderText="例如 4" />
+                            </StackPanel>
+                        </StackPanel>
+
+                        <StackPanel Spacing="10">
+                            <TextBlock Text="DLNA 投屏" FontSize="12" FontWeight="SemiBold" />
+                            <ToggleSwitch x:Name="DlnaRemuxToggle"
+                                          Header="启用 DLNA remux（直接复用）"
+                                          MinWidth="0" />
+                            <ToggleSwitch x:Name="DlnaTranscodeToggle"
+                                          Header="启用 DLNA 转码"
+                                          MinWidth="0" />
+                        </StackPanel>
+
+                        <Button x:Name="SaveNetwork2Btn"
+                                Click="SaveNetwork2Btn_Click"
+                                Content="保存"
+                                Style="{StaticResource AccentButtonStyle}"
+                                Padding="16,8" />
+                        <TextBlock x:Name="Network2StatusText" FontSize="11" Visibility="Collapsed" />
                     </StackPanel>
 
                     <!-- ── Section 4: 视频/图片/文件类型 ── -->
                     <StackPanel x:Name="PanelVideoFile" Spacing="16" Visibility="Collapsed">
                         <TextBlock Style="{StaticResource SectionHeaderStyle}" Text="视频 / 图片 / 文件类型" />
                         <InfoBar IsOpen="True" IsClosable="False" Severity="Informational"
-                                 Title="待 FFI"
-                                 Message="视频/图片类型偏好及文件扩展名过滤需要 wdmm_prefs_* FFI（Core 重构后提供）。" />
+                                 Title="KV-backed (Wave C)"
+                                 Message="file_type_config_json 通过 wdmm_kv_* 写入 Core KV；其他文件类型偏好仍待 wdmm_prefs_* FFI。" />
                         <StackPanel Spacing="6">
-                            <TextBlock Text="视频文件扩展名" FontSize="12" />
-                            <TextBox IsEnabled="False" PlaceholderText="mp4, mkv, avi, …（待 FFI）" />
+                            <TextBlock Text="文件类型配置 (JSON)" FontSize="12" FontWeight="SemiBold" />
+                            <TextBox x:Name="FileTypeConfigBox"
+                                     AcceptsReturn="True"
+                                     TextWrapping="Wrap"
+                                     MinHeight="80"
+                                     PlaceholderText='例如 {"video":["mp4","mkv"],"audio":["flac","mp3"]}'
+                                     FontFamily="Cascadia Mono,Consolas,monospace"
+                                     FontSize="11" />
                         </StackPanel>
-                        <StackPanel Spacing="6">
-                            <TextBlock Text="图片文件扩展名" FontSize="12" />
-                            <TextBox IsEnabled="False" PlaceholderText="jpg, png, webp, …（待 FFI）" />
-                        </StackPanel>
+                        <Button x:Name="SaveVideoFileBtn"
+                                Click="SaveVideoFileBtn_Click"
+                                Content="保存"
+                                Style="{StaticResource AccentButtonStyle}"
+                                Padding="16,8" />
+                        <TextBlock x:Name="VideoFileStatusText" FontSize="11" Visibility="Collapsed" />
                     </StackPanel>
 
                     <!-- ── Section 5: 杂项 ── -->
@@ -179,23 +244,28 @@
 
                         <StackPanel Spacing="6">
                             <TextBlock Text="界面语言" FontSize="12" FontWeight="SemiBold" />
-                            <ComboBox IsEnabled="False" HorizontalAlignment="Stretch">
-                                <ComboBoxItem Content="跟随系统（待 FFI）" IsSelected="True" />
+                            <ComboBox x:Name="LocaleCombo"
+                                      HorizontalAlignment="Stretch">
+                                <ComboBoxItem Content="跟随系统" Tag="system" IsSelected="True" />
+                                <ComboBoxItem Content="简体中文" Tag="zh-CN" />
+                                <ComboBoxItem Content="English"  Tag="en" />
                             </ComboBox>
+                            <TextBlock Style="{StaticResource HintTextStyle}"
+                                       Text="app_locale 通过 wdmm_kv_* 持久化。" />
                         </StackPanel>
 
                         <StackPanel Spacing="6">
                             <TextBlock Text="提示持续时间（秒）" FontSize="12" FontWeight="SemiBold" />
-                            <NumberBox IsEnabled="False"
+                            <NumberBox x:Name="SnackDurationBox"
                                        Minimum="1" Maximum="30" Value="3"
                                        SpinButtonPlacementMode="Compact" />
                             <TextBlock Style="{StaticResource HintTextStyle}"
-                                       Text="待 FFI：全局提示时长设置 API 未导出。" />
+                                       Text="snack_duration 通过 wdmm_kv_* 持久化。" />
                         </StackPanel>
 
                         <Button x:Name="SaveMiscBtn"
                                 Click="SaveMiscBtn_Click"
-                                Content="应用主题"
+                                Content="应用"
                                 Style="{StaticResource AccentButtonStyle}"
                                 Padding="16,8" />
                         <TextBlock x:Name="MiscStatusText" FontSize="11" Visibility="Collapsed" />

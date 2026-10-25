@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.UI.Xaml;
@@ -7,6 +8,7 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Navigation;
 using WdmmDesktop.Generated;
+using WdmmDesktop.Models;
 
 namespace WdmmDesktop.Pages
 {
@@ -306,6 +308,174 @@ namespace WdmmDesktop.Pages
             }
         }
 
+        // ── Add item to folder ────────────────────────────────────────────────
+
+        private async void AddItemBtn_Click(object sender, RoutedEventArgs e)
+        {
+            string? currentFolderId = _crumbs.Count > 0 ? _crumbs[^1].Id : null;
+
+            // Load track list for picker (artist / album / track grouping)
+            var tracks = new List<TrackItem>();
+            try
+            {
+                var json = NativeMethods.TrackList();
+                if (!json.StartsWith("error:"))
+                    tracks = JsonSerializer.Deserialize<List<TrackItem>>(json) ?? new();
+            }
+            catch { /* FFI not loaded */ }
+
+            var allItems = BuildPickerItems(tracks);
+
+            // Build picker UI
+            var searchBox = new TextBox
+            {
+                PlaceholderText = "Search tracks, albums, artists…",
+                MinWidth        = 340
+            };
+            var resultList = new ListView
+            {
+                MinHeight     = 300,
+                SelectionMode = ListViewSelectionMode.Single
+            };
+            foreach (var it in allItems)
+                resultList.Items.Add(it);
+
+            searchBox.TextChanged += (_, _) =>
+            {
+                var q = searchBox.Text.Trim();
+                resultList.Items.Clear();
+                foreach (var it in allItems)
+                    if (q.Length == 0 || it.DisplayName.Contains(q, StringComparison.OrdinalIgnoreCase))
+                        resultList.Items.Add(it);
+            };
+
+            var panel = new StackPanel { Spacing = 8 };
+            panel.Children.Add(searchBox);
+            panel.Children.Add(resultList);
+
+            var dlg = new ContentDialog
+            {
+                Title             = "Add item to folder",
+                Content           = panel,
+                PrimaryButtonText = "Add",
+                CloseButtonText   = "Cancel",
+                XamlRoot          = XamlRoot
+            };
+            if (await dlg.ShowAsync() != ContentDialogResult.Primary) return;
+            if (resultList.SelectedItem is not PickerItem picked) return;
+
+            var folderId  = string.IsNullOrEmpty(currentFolderId) ? "root" : currentFolderId;
+            var addJson   = $"{{\"folder_id\":\"{EscapeJson(folderId)}\","          +
+                             $"\"ref_kind\":\"{EscapeJson(picked.RefKind)}\","        +
+                             $"\"ref_key\":\"{EscapeJson(picked.RefKey)}\","          +
+                             "\"sort_order\":0}";
+
+            try
+            {
+                var result = NativeMethods.UserFolderAddItem(addJson);
+                if (result.StartsWith("error:")) { StatusBar.Text = result; return; }
+                LoadFolder(currentFolderId);
+            }
+            catch (Exception ex) { StatusBar.Text = $"Add failed: {ex.Message}"; }
+        }
+
+        private static List<PickerItem> BuildPickerItems(List<TrackItem> tracks)
+        {
+            var items   = new List<PickerItem>();
+            var albums  = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
+            var artists = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var t in tracks)
+            {
+                if (!string.IsNullOrEmpty(t.Album))  albums.Add(t.Album);
+                if (!string.IsNullOrEmpty(t.Artist)) artists.Add(t.Artist);
+            }
+
+            foreach (var a in artists)
+                items.Add(new PickerItem("artist", a, $"🎤 {a}", "Artist"));
+            foreach (var a in albums)
+                items.Add(new PickerItem("album", a, $"💿 {a}", "Album"));
+            foreach (var t in tracks.OrderBy(x => x.Title))
+                items.Add(new PickerItem("track", t.Id, $"♪ {t.Title}", t.SubLine));
+
+            return items;
+        }
+
+        // ── Remove item from folder ───────────────────────────────────────────
+
+        private async void RemoveItemBtn_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not Button btn || btn.Tag is not ItemDisplayRow row) return;
+
+            var dlg = new ContentDialog
+            {
+                Title             = "Remove item",
+                Content           = $"Remove \"{row.Name}\" from this folder?",
+                PrimaryButtonText = "Remove",
+                CloseButtonText   = "Cancel",
+                XamlRoot          = XamlRoot,
+                DefaultButton     = ContentDialogButton.Close
+            };
+            if (await dlg.ShowAsync() != ContentDialogResult.Primary) return;
+
+            try
+            {
+                var result = NativeMethods.UserFolderRemoveItem(row.FolderId, row.RefKind, row.RefKey);
+                if (result.StartsWith("error:")) { StatusBar.Text = result; return; }
+                string? currentId = _crumbs.Count > 0 ? _crumbs[^1].Id : null;
+                LoadFolder(currentId);
+            }
+            catch (Exception ex) { StatusBar.Text = $"Remove failed: {ex.Message}"; }
+        }
+
+        // ── Reorder items ─────────────────────────────────────────────────────
+
+        private void MoveItemUpBtn_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not Button btn || btn.Tag is not ItemDisplayRow row) return;
+            ReorderItem(row, -1);
+        }
+
+        private void MoveItemDownBtn_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not Button btn || btn.Tag is not ItemDisplayRow row) return;
+            ReorderItem(row, +1);
+        }
+
+        private void ReorderItem(ItemDisplayRow row, int delta)
+        {
+            var items = ItemsList.Items.OfType<ItemDisplayRow>().ToList();
+            var idx   = items.FindIndex(r =>
+                r.FolderId == row.FolderId &&
+                r.RefKind  == row.RefKind  &&
+                r.RefKey   == row.RefKey);
+            if (idx < 0) return;
+            var newIdx = idx + delta;
+            if (newIdx < 0 || newIdx >= items.Count) return;
+
+            // Swap
+            (items[idx], items[newIdx]) = (items[newIdx], items[idx]);
+
+            // Build set_items JSON with contiguous sort_order values
+            var parts = items.Select((it, i) =>
+                $"{{\"folder_id\":\"{EscapeJson(it.FolderId)}\"," +
+                $"\"ref_kind\":\"{EscapeJson(it.RefKind)}\"," +
+                $"\"ref_key\":\"{EscapeJson(it.RefKey)}\"," +
+                $"\"sort_order\":{i}}}");
+            var jsonArray = $"[{string.Join(",", parts)}]";
+
+            string? currentFolderId = _crumbs.Count > 0 ? _crumbs[^1].Id : null;
+            var folderId = string.IsNullOrEmpty(currentFolderId) ? "root" : currentFolderId;
+
+            try
+            {
+                var result = NativeMethods.UserFolderSetItems(folderId, jsonArray);
+                if (result.StartsWith("error:")) { StatusBar.Text = result; return; }
+                LoadFolder(currentFolderId);
+            }
+            catch (Exception ex) { StatusBar.Text = $"Reorder failed: {ex.Message}"; }
+        }
+
         // ── Helpers ───────────────────────────────────────────────────────────
 
         private static string EscapeJson(string s)
@@ -338,6 +508,7 @@ namespace WdmmDesktop.Pages
             public string  FolderId   { get; }
             public string  Name       { get; }
             public bool    IsFolder   => true;
+            public bool    IsItem     => false;
             public string  IconGlyph  => "";   // Folder (matches sidebar Folders glyph)
             public string  SubLine    => "文件夹";
 
@@ -351,13 +522,22 @@ namespace WdmmDesktop.Pages
         // Display row for a leaf item (used in ListView DataTemplate binding)
         public sealed class ItemDisplayRow
         {
+            public string  FolderId   { get; }
+            public string  RefKind    { get; }
+            public string  RefKey     { get; }
+            public int     SortOrder  { get; }
             public string  Name       { get; }
             public bool    IsFolder   => false;
+            public bool    IsItem     => true;
             public string  IconGlyph  { get; }
             public string  SubLine    { get; }
 
             public ItemDisplayRow(ItemRow r)
             {
+                FolderId  = r.FolderId;
+                RefKind   = r.RefKind;
+                RefKey    = r.RefKey;
+                SortOrder = r.SortOrder;
                 Name      = r.RefKey;
                 SubLine   = r.RefKind;
                 IconGlyph = r.RefKind switch
@@ -368,6 +548,25 @@ namespace WdmmDesktop.Pages
                     _        => ""   // Generic item / file
                 };
             }
+        }
+
+        // Picker entry shown in the "Add item" dialog.
+        public sealed class PickerItem
+        {
+            public string RefKind    { get; }
+            public string RefKey     { get; }
+            public string DisplayName{ get; }
+            public string SubLine    { get; }
+
+            public PickerItem(string refKind, string refKey, string displayName, string subLine)
+            {
+                RefKind     = refKind;
+                RefKey      = refKey;
+                DisplayName = displayName;
+                SubLine     = subLine;
+            }
+
+            public override string ToString() => DisplayName;
         }
     }
 }

@@ -38,18 +38,21 @@ namespace WdmmDesktop.Pages
             // Parity matrix — honest done / in progress / blocked.
             // Keep in sync with docs/DESKTOP-PARITY.md. Never mark stubs as real.
             ParityText.Text =
-                "Folders    done   — user-folder tree via FFI (我的文件夹 root)\n"     +
-                "Playlists  done   — FFI (PlaylistList/Create/Delete/ListEntries)\n"    +
-                "              no OpenAPI on this path\n"                                +
-                "Music      done   — wdmm_track_list / search (FFI)\n"                  +
-                "Cast       done   — CastDialog (device picker), no nav tab\n"          +
-                "              DLNA→proxy only, single-file mutex, USN prefs\n"        +
-                "Settings   part   — 7 sections; Home/Theme/Sync live, others 待 FFI\n" +
-                "Tasks      done   — wdmm_queue_status_json / cancel (FFI)\n"            +
-                "Network    part   — wdmm_sync_trigger; accounts local JSON\n"          +
-                "Manga      blocked— no manga FFI (wdmm_manga_* not exported)\n"        +
-                "OpenAPI    opt-in — third-party only (Settings → 第三方/开发者)\n"     +
-                "Local-lib  n/a    — post-Rust-refactor feature; out of scope now";
+                "Wave C (2026-10-25) — Android parity closeout\n\n"                       +
+                "Folders    done   — mount UX: add/remove/reorder track/album/artist\n"   +
+                "              wdmm_user_folder_add_item / remove_item / set_items FFI\n" +
+                "Playlists  done   — set_entries edit UI: add/remove/reorder + FFI\n"     +
+                "Music      done   — wdmm_track_list / search (FFI)\n"                    +
+                "Cast       done   — CastDialog only; CastPage removed Wave C\n"          +
+                "              DLNA→proxy, single-file mutex, USN prefs\n"                +
+                "Settings   done   — 7 sections; all KV-backed controls live Wave C\n"    +
+                "              RememberNetworkPath + last path via Core settings FFI\n"   +
+                "              Library/Misc/Network2/VideoFile/DLNA all KV-backed\n"      +
+                "Tasks      done   — wdmm_queue_status_json / cancel (FFI)\n"             +
+                "Network    part   — account CRUD + sync; last-path session memory\n"     +
+                "Manga      blocked— no manga FFI (wdmm_manga_* not exported)\n"          +
+                "OpenAPI    opt-in — third-party only (Settings → 第三方/开发者)\n"      +
+                "Local-lib  n/a    — post-Rust-refactor feature; out of scope";
         }
     }
 }

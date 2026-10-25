@@ -32,6 +32,7 @@ namespace WdmmDesktop.Dialogs
 
             LoadLocalPrefs();
             LoadFfiState();
+            LoadFfiKvSettings();
             LoadAccounts();
         }
 
@@ -80,7 +81,12 @@ namespace WdmmDesktop.Dialogs
             // Default home combo
             SelectComboByTag(DefaultHomeCombo, _prefs.DefaultHome);
 
-            // Remember network path
+            // Remember network path — prefer FFI value (Core KV) over LocalStore cache.
+            try
+            {
+                _prefs.RememberNetworkPath = NativeMethods.SettingsGetNetworkRememberLastPath();
+            }
+            catch { /* FFI not loaded; keep LocalStore value */ }
             RememberNetworkPathToggle.IsOn = _prefs.RememberNetworkPath;
 
             // Theme
@@ -114,9 +120,14 @@ namespace WdmmDesktop.Dialogs
 
         private void SaveHomeBtn_Click(object sender, RoutedEventArgs e)
         {
-            _prefs.DefaultHome        = SelectedComboTag(DefaultHomeCombo);
+            _prefs.DefaultHome         = SelectedComboTag(DefaultHomeCombo);
             _prefs.RememberNetworkPath = RememberNetworkPathToggle.IsOn;
             LocalStore.Save(PrefsFile, _prefs);
+
+            // Also persist to Core via settings FFI so NetworkPage can read it next session.
+            try { NativeMethods.SettingsSetNetworkRememberLastPath(_prefs.RememberNetworkPath); }
+            catch { /* FFI not loaded */ }
+
             ShowInlineStatus(HomeStatusText, "已保存。", isError: false);
         }
 
@@ -129,7 +140,33 @@ namespace WdmmDesktop.Dialogs
 
             // Apply theme immediately to the main window content root.
             ApplyTheme(_prefs.Theme);
-            ShowInlineStatus(MiscStatusText, "主题已应用。", isError: false);
+
+            // Persist locale + snack_duration to Core KV (best-effort).
+            var errs = new System.Text.StringBuilder();
+            try
+            {
+                var locale = SelectedComboTag(LocaleCombo);
+                string r;
+                if (!string.IsNullOrEmpty(locale) && locale != "system")
+                    r = NativeMethods.KvSet("app_locale", locale);
+                else
+                    r = NativeMethods.KvDelete("app_locale");
+                if (r.StartsWith("error:")) errs.Append(r).Append(' ');
+            }
+            catch { errs.Append("locale-FFI-unavailable "); }
+
+            try
+            {
+                var secs = (int)SnackDurationBox.Value;
+                var r = NativeMethods.KvSet("snack_duration", secs.ToString());
+                if (r.StartsWith("error:")) errs.Append(r).Append(' ');
+            }
+            catch { errs.Append("snack-FFI-unavailable "); }
+
+            var msg = errs.Length > 0
+                ? $"主题已应用，KV 部分失败：{errs}"
+                : "已应用。";
+            ShowInlineStatus(MiscStatusText, msg, isError: errs.Length > 0);
         }
 
         private static void ApplyTheme(string theme)
@@ -288,6 +325,148 @@ namespace WdmmDesktop.Dialogs
         private void ShowApiStatus(string msg, bool isError)
         {
             ShowInlineStatus(SaveStatusText, msg, isError);
+        }
+
+        // ── Section 2: 媒体库 (KV-backed) ──────────────────────────────────────
+
+        private void SaveLibraryBtn_Click(object sender, RoutedEventArgs e)
+        {
+            var errs = new System.Text.StringBuilder();
+            void Set(string k, string v)
+            {
+                var r = NativeMethods.KvSet(k, v);
+                if (r.StartsWith("error:")) errs.Append(k).Append(':').Append(r).Append(' ');
+            }
+            try
+            {
+                Set("scan_recursive", ScanRecursiveToggle.IsOn ? "1" : "0");
+                Set("scan_depth",     ((int)ScanDepthBox.Value).ToString());
+                Set("scan_audio",     ScanAudioToggle.IsOn       ? "1" : "0");
+                Set("scan_video",     ScanVideoToggle.IsOn       ? "1" : "0");
+                Set("scan_manga",     ScanMangaToggle.IsOn       ? "1" : "0");
+            }
+            catch (Exception ex) { errs.Append(ex.Message); }
+
+            ShowInlineStatus(LibraryStatusText,
+                errs.Length > 0 ? $"部分保存失败：{errs}" : "已保存。",
+                isError: errs.Length > 0);
+        }
+
+        // ── Section 3: 网络库 (KV-backed) ─────────────────────────────────────
+
+        private void SaveNetwork2Btn_Click(object sender, RoutedEventArgs e)
+        {
+            var errs = new System.Text.StringBuilder();
+            void Set(string k, string v)
+            {
+                var r = NativeMethods.KvSet(k, v);
+                if (r.StartsWith("error:")) errs.Append(k).Append(':').Append(r).Append(' ');
+            }
+            try
+            {
+                Set("crypt_sequential_download",  CryptSequentialDownloadToggle.IsOn ? "1" : "0");
+                Set("prefer_libsodium_secretbox", PreferLibsodiumToggle.IsOn        ? "1" : "0");
+                var partSize  = DownloadPartSizeBox.Text.Trim();
+                var partCount = DownloadPartCountBox.Text.Trim();
+                if (!string.IsNullOrEmpty(partSize))  Set("download_part_size",  partSize);
+                if (!string.IsNullOrEmpty(partCount)) Set("download_part_count", partCount);
+                Set("dlna_remux",     DlnaRemuxToggle.IsOn     ? "1" : "0");
+                Set("dlna_transcode", DlnaTranscodeToggle.IsOn ? "1" : "0");
+            }
+            catch (Exception ex) { errs.Append(ex.Message); }
+
+            ShowInlineStatus(Network2StatusText,
+                errs.Length > 0 ? $"部分保存失败：{errs}" : "已保存。",
+                isError: errs.Length > 0);
+        }
+
+        // ── Section 4: 视频/文件类型 (KV-backed) ──────────────────────────────
+
+        private void SaveVideoFileBtn_Click(object sender, RoutedEventArgs e)
+        {
+            var json = FileTypeConfigBox.Text.Trim();
+            if (string.IsNullOrEmpty(json))
+            {
+                ShowInlineStatus(VideoFileStatusText, "请输入 JSON 配置。", isError: true);
+                return;
+            }
+            try
+            {
+                // Validate JSON before persisting.
+                JsonDocument.Parse(json);
+                var r = NativeMethods.KvSet("file_type_config_json", json);
+                ShowInlineStatus(VideoFileStatusText,
+                    r.StartsWith("error:") ? r : "已保存。",
+                    isError: r.StartsWith("error:"));
+            }
+            catch (JsonException je)
+            {
+                ShowInlineStatus(VideoFileStatusText, $"JSON 格式错误：{je.Message}", isError: true);
+            }
+            catch (Exception ex)
+            {
+                ShowInlineStatus(VideoFileStatusText, $"FFI 失败：{ex.Message}", isError: true);
+            }
+        }
+
+        // ── KV helpers ────────────────────────────────────────────────────────
+
+        /// <summary>Load KV-backed settings from Core FFI into the UI controls.</summary>
+        private void LoadFfiKvSettings()
+        {
+            try
+            {
+                // ── Library ───────────────────────────────────────────────────
+                ScanRecursiveToggle.IsOn = KvBool("scan_recursive", defaultVal: true);
+                ScanDepthBox.Value       = KvInt ("scan_depth",     defaultVal: 5);
+                ScanAudioToggle.IsOn     = KvBool("scan_audio",     defaultVal: true);
+                ScanVideoToggle.IsOn     = KvBool("scan_video",     defaultVal: true);
+                ScanMangaToggle.IsOn     = KvBool("scan_manga",     defaultVal: false);
+
+                // ── Network2 ─────────────────────────────────────────────────
+                CryptSequentialDownloadToggle.IsOn = KvBool("crypt_sequential_download", false);
+                PreferLibsodiumToggle.IsOn          = KvBool("prefer_libsodium_secretbox", false);
+                DownloadPartSizeBox.Text            = KvString("download_part_size");
+                DownloadPartCountBox.Text            = KvString("download_part_count");
+                DlnaRemuxToggle.IsOn                 = KvBool("dlna_remux",     false);
+                DlnaTranscodeToggle.IsOn             = KvBool("dlna_transcode", false);
+
+                // ── VideoFile ─────────────────────────────────────────────────
+                FileTypeConfigBox.Text = KvString("file_type_config_json");
+
+                // ── Misc ──────────────────────────────────────────────────────
+                var locale = KvString("app_locale");
+                if (!string.IsNullOrEmpty(locale)) SelectComboByTag(LocaleCombo, locale);
+                SnackDurationBox.Value = KvInt("snack_duration", defaultVal: 3);
+            }
+            catch { /* FFI not loaded; controls keep XAML defaults */ }
+        }
+
+        private static bool KvBool(string key, bool defaultVal)
+        {
+            try
+            {
+                var v = NativeMethods.KvGet(key);
+                if (string.IsNullOrEmpty(v)) return defaultVal;
+                return v == "1" || v.Equals("true", StringComparison.OrdinalIgnoreCase);
+            }
+            catch { return defaultVal; }
+        }
+
+        private static int KvInt(string key, int defaultVal)
+        {
+            try
+            {
+                var v = NativeMethods.KvGet(key);
+                return int.TryParse(v, out var n) ? n : defaultVal;
+            }
+            catch { return defaultVal; }
+        }
+
+        private static string KvString(string key)
+        {
+            try { return NativeMethods.KvGet(key) ?? ""; }
+            catch { return ""; }
         }
     }
 }
