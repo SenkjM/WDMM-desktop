@@ -11,9 +11,8 @@ namespace WdmmDesktop.Pages
 {
     // MangaPage — wired to wdmm_manga_* FFI (Wave D, fdb05df).
     //
-    // On navigate: wdmm_manga_list() fetches all manga entries; progress is merged
-    // in from wdmm_manga_list_progress().  Clicking a card opens a detail dialog
-    // that calls wdmm_manga_get + wdmm_manga_list_pages for richer info.
+    // On navigate: wdmm_manga_list() + wdmm_manga_list_progress(). Detail dialog
+    // supports wdmm_manga_get/list_pages read plus upsert / set_progress / delete.
     //
     // Library must be initialised by wdmm_library_init before any call lands.
     // On a Linux dev box the DLL is absent — FFI calls are silently tolerated and
@@ -134,7 +133,7 @@ namespace WdmmDesktop.Pages
             await ShowDetailDialog(item);
         }
 
-        // ── Detail dialog stub ────────────────────────────────────────────────
+        // ── Detail dialog (read + write via manga FFI) ───────────────────────
 
         /// <summary>
         /// Opens a ContentDialog showing the manga detail and its page list.
@@ -145,27 +144,132 @@ namespace WdmmDesktop.Pages
         {
             var body = BuildDetailBody(item);
 
+            var titleBox = new TextBox { Header = "Title", Text = item.Title, Margin = new Thickness(0, 0, 0, 8) };
+            var authorBox = new TextBox { Header = "Author", Text = item.Author ?? "", Margin = new Thickness(0, 0, 0, 8) };
+            var seriesBox = new TextBox { Header = "Series", Text = item.Series ?? "", Margin = new Thickness(0, 0, 0, 8) };
+            var progressBox = new NumberBox
+            {
+                Header = "Progress page index (0-based)",
+                Minimum = 0,
+                Maximum = item.PageCount > 0 ? item.PageCount - 1 : 99999,
+                Value = item.CurrentPage >= 0 ? item.CurrentPage : 0,
+                SpinButtonPlacementMode = NumberBoxSpinButtonPlacementMode.Compact,
+                Margin = new Thickness(0, 0, 0, 8),
+            };
+            var meta = new TextBlock
+            {
+                Text = body,
+                FontSize = 11,
+                TextWrapping = Microsoft.UI.Xaml.TextWrapping.Wrap,
+                FontFamily = new Microsoft.UI.Xaml.Media.FontFamily("Cascadia Mono,Consolas,monospace"),
+                Opacity = 0.8,
+                Margin = new Thickness(0, 8, 0, 0),
+            };
+            var stack = new StackPanel { Spacing = 4 };
+            stack.Children.Add(titleBox);
+            stack.Children.Add(authorBox);
+            stack.Children.Add(seriesBox);
+            stack.Children.Add(progressBox);
+            stack.Children.Add(new TextBlock { Text = "Raw metadata", FontWeight = Microsoft.UI.Text.FontWeights.SemiBold, Margin = new Thickness(0, 8, 0, 0) });
+            stack.Children.Add(meta);
+
             var dialog = new ContentDialog
             {
-                Title           = item.Title,
-                Content         = new ScrollViewer
-                {
-                    MaxHeight = 320,
-                    Content   = new TextBlock
-                    {
-                        Text         = body,
-                        FontSize     = 12,
-                        TextWrapping = Microsoft.UI.Xaml.TextWrapping.Wrap,
-                        FontFamily   = new Microsoft.UI.Xaml.Media.FontFamily(
-                                           "Cascadia Mono,Consolas,monospace"),
-                        Opacity      = 0.85,
-                    }
-                },
+                Title = item.Title,
+                Content = new ScrollViewer { MaxHeight = 420, Content = stack },
+                PrimaryButtonText = "Save",
+                SecondaryButtonText = "Set progress",
                 CloseButtonText = "Close",
-                XamlRoot        = XamlRoot,
+                DefaultButton = ContentDialogButton.Primary,
+                XamlRoot = XamlRoot,
             };
 
-            await dialog.ShowAsync();
+            // Delete via a separate confirm — ContentDialog has only 3 buttons.
+            var deleteBtn = new Button { Content = "Delete…", Margin = new Thickness(0, 8, 0, 0) };
+            stack.Children.Insert(0, deleteBtn);
+            string? pendingDelete = null;
+            deleteBtn.Click += async (_, __) =>
+            {
+                var confirm = new ContentDialog
+                {
+                    Title = "Delete manga?",
+                    Content = $"Remove «{item.Title}» from the library? This calls wdmm_manga_delete.",
+                    PrimaryButtonText = "Delete",
+                    CloseButtonText = "Cancel",
+                    DefaultButton = ContentDialogButton.Close,
+                    XamlRoot = XamlRoot,
+                };
+                if (await confirm.ShowAsync() == ContentDialogResult.Primary)
+                {
+                    pendingDelete = item.Id;
+                    dialog.Hide();
+                }
+            };
+
+            var result = await dialog.ShowAsync();
+            if (pendingDelete != null)
+            {
+                try
+                {
+                    var r = NativeMethods.MangaDelete(pendingDelete);
+                    if (r.StartsWith("error:", StringComparison.Ordinal))
+                        await ShowMsg("Delete failed", r);
+                }
+                catch (Exception ex) { await ShowMsg("Delete failed", ex.Message); }
+                LoadMangas();
+                return;
+            }
+
+            if (result == ContentDialogResult.Primary)
+            {
+                // Upsert metadata
+                try
+                {
+                    var payload = new Dictionary<string, object?>
+                    {
+                        ["id"] = item.Id,
+                        ["title"] = titleBox.Text?.Trim() ?? item.Title,
+                        ["author"] = string.IsNullOrWhiteSpace(authorBox.Text) ? null : authorBox.Text.Trim(),
+                        ["series"] = string.IsNullOrWhiteSpace(seriesBox.Text) ? null : seriesBox.Text.Trim(),
+                        ["volume"] = item.Volume,
+                        ["chapter_number"] = item.ChapterNumber,
+                        ["page_count"] = item.PageCount,
+                        ["format"] = item.Format,
+                        ["source_name"] = item.SourceName,
+                        ["remote_path"] = item.RemotePath,
+                    };
+                    var json = JsonSerializer.Serialize(payload);
+                    var r = NativeMethods.MangaUpsert(json);
+                    if (r.StartsWith("error:", StringComparison.Ordinal))
+                        await ShowMsg("Upsert failed", r);
+                }
+                catch (Exception ex) { await ShowMsg("Upsert failed", ex.Message); }
+                LoadMangas();
+            }
+            else if (result == ContentDialogResult.Secondary)
+            {
+                try
+                {
+                    var page = (long)Math.Max(0, progressBox.Value);
+                    var r = NativeMethods.MangaSetProgress(item.Id, page);
+                    if (r.StartsWith("error:", StringComparison.Ordinal))
+                        await ShowMsg("Set progress failed", r);
+                }
+                catch (Exception ex) { await ShowMsg("Set progress failed", ex.Message); }
+                LoadMangas();
+            }
+        }
+
+        private async System.Threading.Tasks.Task ShowMsg(string title, string body)
+        {
+            var d = new ContentDialog
+            {
+                Title = title,
+                Content = body,
+                CloseButtonText = "OK",
+                XamlRoot = XamlRoot,
+            };
+            await d.ShowAsync();
         }
 
         private string BuildDetailBody(MangaItem item)
