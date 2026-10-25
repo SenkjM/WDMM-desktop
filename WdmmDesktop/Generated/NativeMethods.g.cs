@@ -1233,6 +1233,143 @@ namespace WdmmDesktop.Generated
             }
         }
 
+        // ── Driver registry (Phase 0 Wave C) ──────────────────────────────────
+
+        /// <summary>
+        /// List directory entries for a given provider using driver-level config.
+        /// <paramref name="providerType"/> e.g. "webdav", "aliyundrive", "115".
+        /// <paramref name="configJson"/> is provider-specific config object.
+        /// <paramref name="path"/> is the remote path to list.
+        /// Returns a JSON array or "error:…". Caller must free the result.
+        /// </summary>
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern FfiString wdmm_driver_list(
+            IntPtr providerType, IntPtr configJson, IntPtr path);
+
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern FfiString wdmm_driver_mkdir(
+            IntPtr providerType, IntPtr configJson, IntPtr path);
+
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern FfiString wdmm_driver_rename(
+            IntPtr providerType, IntPtr configJson, IntPtr oldPath, IntPtr newPath);
+
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern FfiString wdmm_driver_remove(
+            IntPtr providerType, IntPtr configJson, IntPtr path);
+
+        /// <summary>
+        /// Get metadata for a single entry at <paramref name="path"/>.
+        /// Returns a JSON object, "null" if not found, or "error:…".
+        /// </summary>
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern FfiString wdmm_driver_get(
+            IntPtr providerType, IntPtr configJson, IntPtr path);
+
+        /// <summary>
+        /// List directory entries for a saved account.
+        /// <paramref name="accountId"/> is the DB-stored account UUID.
+        /// Returns a JSON array or "error:…". Caller must free the result.
+        /// </summary>
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern FfiString wdmm_account_list_dir(IntPtr accountId, IntPtr path);
+
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern FfiString wdmm_account_mkdir(IntPtr accountId, IntPtr path);
+
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern FfiString wdmm_account_rename(
+            IntPtr accountId, IntPtr oldPath, IntPtr newPath);
+
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern FfiString wdmm_account_remove(IntPtr accountId, IntPtr path);
+
+        /// <summary>
+        /// Get metadata for a single entry in the account's directory.
+        /// Returns a JSON object, "null" if not found, or "error:…".
+        /// </summary>
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern FfiString wdmm_account_get_entry(IntPtr accountId, IntPtr path);
+
+        // Driver registry wrappers
+
+        public static string DriverList(string providerType, string configJson, string path)
+        {
+            var p1 = Utf8Z(providerType); var p2 = Utf8Z(configJson); var p3 = Utf8Z(path);
+            try { return wdmm_driver_list(p1, p2, p3).ToStringAndFree(); }
+            finally { Marshal.FreeHGlobal(p1); Marshal.FreeHGlobal(p2); Marshal.FreeHGlobal(p3); }
+        }
+
+        public static string DriverMkdir(string providerType, string configJson, string path)
+        {
+            var p1 = Utf8Z(providerType); var p2 = Utf8Z(configJson); var p3 = Utf8Z(path);
+            try { return wdmm_driver_mkdir(p1, p2, p3).ToStringAndFree(); }
+            finally { Marshal.FreeHGlobal(p1); Marshal.FreeHGlobal(p2); Marshal.FreeHGlobal(p3); }
+        }
+
+        public static string DriverRename(string providerType, string configJson, string oldPath, string newPath)
+        {
+            var p1 = Utf8Z(providerType); var p2 = Utf8Z(configJson);
+            var p3 = Utf8Z(oldPath); var p4 = Utf8Z(newPath);
+            try { return wdmm_driver_rename(p1, p2, p3, p4).ToStringAndFree(); }
+            finally
+            {
+                Marshal.FreeHGlobal(p1); Marshal.FreeHGlobal(p2);
+                Marshal.FreeHGlobal(p3); Marshal.FreeHGlobal(p4);
+            }
+        }
+
+        public static string DriverRemove(string providerType, string configJson, string path)
+        {
+            var p1 = Utf8Z(providerType); var p2 = Utf8Z(configJson); var p3 = Utf8Z(path);
+            try { return wdmm_driver_remove(p1, p2, p3).ToStringAndFree(); }
+            finally { Marshal.FreeHGlobal(p1); Marshal.FreeHGlobal(p2); Marshal.FreeHGlobal(p3); }
+        }
+
+        public static string DriverGet(string providerType, string configJson, string path)
+        {
+            var p1 = Utf8Z(providerType); var p2 = Utf8Z(configJson); var p3 = Utf8Z(path);
+            try { return wdmm_driver_get(p1, p2, p3).ToStringAndFree(); }
+            finally { Marshal.FreeHGlobal(p1); Marshal.FreeHGlobal(p2); Marshal.FreeHGlobal(p3); }
+        }
+
+        // Account-based wrappers
+
+        public static string AccountListDir(string accountId, string path)
+        {
+            var p1 = Utf8Z(accountId); var p2 = Utf8Z(path);
+            try { return wdmm_account_list_dir(p1, p2).ToStringAndFree(); }
+            finally { Marshal.FreeHGlobal(p1); Marshal.FreeHGlobal(p2); }
+        }
+
+        public static string AccountMkdir(string accountId, string path)
+        {
+            var p1 = Utf8Z(accountId); var p2 = Utf8Z(path);
+            try { return wdmm_account_mkdir(p1, p2).ToStringAndFree(); }
+            finally { Marshal.FreeHGlobal(p1); Marshal.FreeHGlobal(p2); }
+        }
+
+        public static string AccountRename(string accountId, string oldPath, string newPath)
+        {
+            var p1 = Utf8Z(accountId); var p2 = Utf8Z(oldPath); var p3 = Utf8Z(newPath);
+            try { return wdmm_account_rename(p1, p2, p3).ToStringAndFree(); }
+            finally { Marshal.FreeHGlobal(p1); Marshal.FreeHGlobal(p2); Marshal.FreeHGlobal(p3); }
+        }
+
+        public static string AccountRemove(string accountId, string path)
+        {
+            var p1 = Utf8Z(accountId); var p2 = Utf8Z(path);
+            try { return wdmm_account_remove(p1, p2).ToStringAndFree(); }
+            finally { Marshal.FreeHGlobal(p1); Marshal.FreeHGlobal(p2); }
+        }
+
+        public static string AccountGetEntry(string accountId, string path)
+        {
+            var p1 = Utf8Z(accountId); var p2 = Utf8Z(path);
+            try { return wdmm_account_get_entry(p1, p2).ToStringAndFree(); }
+            finally { Marshal.FreeHGlobal(p1); Marshal.FreeHGlobal(p2); }
+        }
+
         // ── Queue concurrency convenience wrappers ────────────────────────────
 
         /// <summary>Return the current queue concurrency limit (1–8).</summary>
