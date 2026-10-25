@@ -789,42 +789,42 @@ namespace WdmmDesktop.Generated
 
         /// <summary>
         /// Upsert a CUE album from JSON.
-        /// Expected fields: {id?: i64, account_id, webdav_url, title, artist, album, genre, date, total_tracks}.
-        /// Returns the cue_album_id (i64) or -1 on error.
+        /// Expected fields: {source_name, cue_remote_path, title, artist, album, genre, date, total_tracks}.
+        /// Returns "ok" or "error:…".
         /// <paramref name="json"/> must be a null-terminated UTF-8 JSON string.
         /// </summary>
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
-        public static extern long wdmm_cue_album_upsert(IntPtr json);
+        public static extern FfiString wdmm_cue_album_upsert(IntPtr json);
 
         /// <summary>
         /// Upsert a CUE slice from JSON.
-        /// Expected fields: {id?: i64, cue_album_id, track_num, title, performer, start_sec, duration_sec}.
-        /// Returns the cue_slice_id (i64) or -1 on error.
+        /// Expected fields: {music_id, source_name, cue_remote_path, track_num, title, performer, start_sec, duration_sec}.
+        /// Returns "ok" or "error:…".
         /// <paramref name="json"/> must be a null-terminated UTF-8 JSON string.
         /// </summary>
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
-        public static extern long wdmm_cue_slice_upsert(IntPtr json);
+        public static extern FfiString wdmm_cue_slice_upsert(IntPtr json);
 
         /// <summary>
-        /// Delete a specific CUE slice.
-        /// Returns 0 on success, non-zero on error.
+        /// Delete a specific CUE slice by music_id.
+        /// Returns "ok" or "error:…".
         /// </summary>
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
-        public static extern int wdmm_cue_slice_delete(long cueAlbumId, int trackNum);
+        public static extern FfiString wdmm_cue_slice_delete(IntPtr musicId);
 
         /// <summary>
         /// Delete a CUE album and all its slices (CASCADE).
-        /// Returns 0 on success, non-zero on error.
+        /// Returns "ok" or "error:…".
         /// </summary>
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
-        public static extern int wdmm_cue_album_delete(long cueAlbumId);
+        public static extern FfiString wdmm_cue_album_delete(IntPtr sourceName, IntPtr cueRemotePath);
 
         /// <summary>
-        /// List all slices for a CUE album.
-        /// Returns a JSON array string. Caller must free the result.
+        /// Count remaining slices for a CUE album.
+        /// Returns decimal count string (e.g. "5") or "error:…".
         /// </summary>
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
-        public static extern FfiString wdmm_cue_remaining_slices(long cueAlbumId);
+        public static extern FfiString wdmm_cue_remaining_slices(IntPtr sourceName, IntPtr cueRemotePath);
 
         // ── Playlists (Core 6a02b3b) ──────────────────────────────────────────
         // Requires wdmm_library_init first.
@@ -898,46 +898,28 @@ namespace WdmmDesktop.Generated
         // ── CUE Sheet convenience wrappers ─────────────────────────────────────
 
         /// <summary>
-        /// Upsert a CUE album from JSON. Returns the cue_album_id (i64) or -1 on error.
+        /// Upsert a CUE album from JSON. Returns "ok" or "error:…".
         /// </summary>
-        public static long CueAlbumUpsert(string json)
-        {
-            var bytes = System.Text.Encoding.UTF8.GetBytes(json + '\0');
-            var ptr = Marshal.AllocHGlobal(bytes.Length);
-            try
-            {
-                Marshal.Copy(bytes, 0, ptr, bytes.Length);
-                return wdmm_cue_album_upsert(ptr);
-            }
-            finally { Marshal.FreeHGlobal(ptr); }
-        }
+        public static string CueAlbumUpsert(string json)
+            => WithNativeString(json, wdmm_cue_album_upsert);
 
         /// <summary>
-        /// Upsert a CUE slice from JSON. Returns the cue_slice_id (i64) or -1 on error.
+        /// Upsert a CUE slice from JSON. Returns "ok" or "error:…".
         /// </summary>
-        public static long CueSliceUpsert(string json)
-        {
-            var bytes = System.Text.Encoding.UTF8.GetBytes(json + '\0');
-            var ptr = Marshal.AllocHGlobal(bytes.Length);
-            try
-            {
-                Marshal.Copy(bytes, 0, ptr, bytes.Length);
-                return wdmm_cue_slice_upsert(ptr);
-            }
-            finally { Marshal.FreeHGlobal(ptr); }
-        }
+        public static string CueSliceUpsert(string json)
+            => WithNativeString(json, wdmm_cue_slice_upsert);
 
-        /// <summary>Delete a specific CUE slice. Returns 0 on success.</summary>
-        public static int CueSliceDelete(long cueAlbumId, int trackNum)
-            => wdmm_cue_slice_delete(cueAlbumId, trackNum);
+        /// <summary>Delete a specific CUE slice by music_id. Returns "ok" or "error:…".</summary>
+        public static string CueSliceDelete(string musicId)
+            => WithNativeString(musicId, wdmm_cue_slice_delete);
 
-        /// <summary>Delete a CUE album and all its slices (CASCADE). Returns 0 on success.</summary>
-        public static int CueAlbumDelete(long cueAlbumId)
-            => wdmm_cue_album_delete(cueAlbumId);
+        /// <summary>Delete a CUE album and all its slices (CASCADE). Returns "ok" or "error:…".</summary>
+        public static string CueAlbumDelete(string sourceName, string cueRemotePath)
+            => WithNativeString2(sourceName, cueRemotePath, wdmm_cue_album_delete);
 
-        /// <summary>List all slices for a CUE album as a JSON array.</summary>
-        public static string CueRemainingSlices(long cueAlbumId)
-            => wdmm_cue_remaining_slices(cueAlbumId).ToStringAndFree();
+        /// <summary>Count remaining slices for a CUE album. Returns decimal count string (e.g. "5") or "error:…".</summary>
+        public static string CueRemainingSlices(string sourceName, string cueRemotePath)
+            => WithNativeString2(sourceName, cueRemotePath, wdmm_cue_remaining_slices);
 
         // ── Playlist convenience wrappers ──────────────────────────────────────
 
