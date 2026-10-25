@@ -69,10 +69,12 @@
 
         <!-- Right: account form + sync -->
         <ScrollViewer Grid.Column="1" Padding="20,14,20,20">
-            <StackPanel x:Name="FormPanel"
-                        Spacing="14"
-                        MaxWidth="420"
-                        IsEnabled="False">
+            <ContentControl x:Name="FormPanel"
+                            IsEnabled="False"
+                            HorizontalContentAlignment="Stretch"
+                            VerticalContentAlignment="Stretch">
+            <StackPanel Spacing="14"
+                        MaxWidth="420">
 
                 <TextBlock x:Name="FormTitle"
                            FontSize="15"
@@ -134,6 +136,7 @@
                            Text="Account list persisted locally (%LOCALAPPDATA%\Wdmm\accounts.json).&#x0a;TODO: wdmm_account_list / wdmm_account_save not yet in FFI." />
 
             </StackPanel>
+            </ContentControl>
         </ScrollViewer>
     </Grid>
 </Page>

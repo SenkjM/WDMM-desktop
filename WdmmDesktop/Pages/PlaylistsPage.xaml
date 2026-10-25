@@ -23,9 +23,12 @@
                  Message="Playlists need OpenAPI. Open Settings (gear) → Start server. Direct FFI wdmm_playlist_list is not exported yet @ d8b2217." />
 
         <!-- Main layout: list left, detail right -->
-        <Grid x:Name="MainGrid"
-              Grid.Row="1"
-              IsEnabled="False">
+        <ContentControl x:Name="MainGrid"
+                        Grid.Row="1"
+                        IsEnabled="False"
+                        HorizontalContentAlignment="Stretch"
+                        VerticalContentAlignment="Stretch">
+        <Grid>
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="260" MinWidth="0" />
                 <ColumnDefinition Width="*" />
@@ -171,5 +174,6 @@
                            TextWrapping="Wrap" />
             </Grid>
         </Grid>
+        </ContentControl>
     </Grid>
 </Page>
