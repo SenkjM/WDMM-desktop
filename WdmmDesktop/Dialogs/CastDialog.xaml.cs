@@ -155,8 +155,10 @@ namespace WdmmDesktop.Dialogs
                 if (proxyUrl.StartsWith("error:"))
                     SetStatus(proxyUrl, isError: true);
                 else
+                {
                     var label = string.IsNullOrEmpty(dev.DisplayName) ? dev.FriendlyName : dev.DisplayName;
                     SetStatus($"Casting {System.IO.Path.GetFileName(filePath)} → {label}", isError: false);
+                }
             }
             catch (Exception ex)
             {

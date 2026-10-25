@@ -88,7 +88,7 @@ namespace WdmmDesktop.Pages
             catch { }
 
             _stack.Add(root);
-            _ = LoadDirAsync();
+            LoadDirAsync();
         }
 
         async void LoadDirAsync()
@@ -192,17 +192,17 @@ namespace WdmmDesktop.Pages
         {
             if (_stack.Count <= 1) return;
             _stack.RemoveAt(_stack.Count - 1);
-            _ = LoadDirAsync();
+            LoadDirAsync();
         }
 
-        void RefreshBtn_Click(object sender, RoutedEventArgs e) => _ = LoadDirAsync();
+        void RefreshBtn_Click(object sender, RoutedEventArgs e) => LoadDirAsync();
 
         void EntryList_DoubleTapped(object sender, DoubleTappedRoutedEventArgs e)
         {
             if (EntryList.SelectedItem is not RemoteEntry ent || !ent.IsDir) return;
             var next = string.IsNullOrEmpty(ent.Path) ? Combine(CurrentPath, ent.Name) : ent.Path;
             _stack.Add(next);
-            _ = LoadDirAsync();
+            LoadDirAsync();
         }
 
         static string Combine(string parent, string name)
@@ -239,7 +239,7 @@ namespace WdmmDesktop.Pages
                     if (r.StartsWith("error:", StringComparison.Ordinal))
                         throw new Exception(r.Substring(6));
                 }
-                _ = LoadDirAsync();
+                LoadDirAsync();
             }
             catch (Exception ex)
             {
@@ -274,7 +274,7 @@ namespace WdmmDesktop.Pages
                     if (r.StartsWith("error:", StringComparison.Ordinal))
                         throw new Exception(r.Substring(6));
                 }
-                _ = LoadDirAsync();
+                LoadDirAsync();
             }
             catch (Exception ex)
             {
@@ -305,7 +305,7 @@ namespace WdmmDesktop.Pages
                     if (r.StartsWith("error:", StringComparison.Ordinal))
                         throw new Exception(r.Substring(6));
                 }
-                _ = LoadDirAsync();
+                LoadDirAsync();
             }
             catch (Exception ex)
             {
