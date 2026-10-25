@@ -115,15 +115,18 @@ jobs:
       # Publish unpackaged self-contained win-x64 (WindowsPackageType=None +
       # WindowsAppSDKSelfContained=true are already set in the csproj).
       - name: Publish self-contained win-x64
-        run: >
-          dotnet publish WdmmDesktop/WdmmDesktop.csproj
-          -c Release
-          -r win-x64
-          --self-contained true
-          -p:Platform=x64
-          -p:WindowsPackageType=None
-          -p:WindowsAppSDKSelfContained=true
-          -o publish/win-x64
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Clear PublishProfile (csproj points at missing win-x64.pubxml).
+          # EnableMsixTooling stays in csproj; WindowsPackageType=None keeps unpackaged.
+          if ! dotnet publish WdmmDesktop/WdmmDesktop.csproj             -c Release             -r win-x64             --self-contained true             -p:Platform=x64             -p:PublishProfile=             -p:WindowsPackageType=None             -p:WindowsAppSDKSelfContained=true             -p:EnableMsixTooling=false             -o publish/win-x64             -v:n; then
+            echo "::error::dotnet publish failed; dumping XamlCompiler leftovers if any"
+            find WdmmDesktop/obj -name 'output.json' -o -name '*.xaml' -path '*/intermediate/*' 2>/dev/null | head -20 || true
+            find WdmmDesktop/obj -name 'output.json' -print -exec python -c "import json,sys; p=sys.argv[1]; d=json.load(open(p,encoding='utf-8')); print(json.dumps(d,indent=2)[:8000])" {} \; 2>/dev/null | head -200 || true
+            find WdmmDesktop/obj -name '*.err' -o -name '*Xaml*' 2>/dev/null | head -40 || true
+            exit 1
+          fi
 
       # Copy DLL next to the exe regardless of whether the CopyRustDll
       # MSBuild target ran (it's documented as optional in the csproj/README).
