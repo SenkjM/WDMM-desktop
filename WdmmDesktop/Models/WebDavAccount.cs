@@ -73,6 +73,10 @@ namespace WdmmDesktop.Models
             return a;
         }
 
+        /// <summary>
+        /// Build upsert payload with credentials as nested JSON object (Phase 0.2 Wave C).
+        /// Core will store credentials as UTF-8 JSON bytes (or encrypted if passphrase given).
+        /// </summary>
         public string ToUpsertJson()
         {
             var payload = new
