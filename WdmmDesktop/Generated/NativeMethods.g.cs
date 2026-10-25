@@ -355,13 +355,28 @@ namespace WdmmDesktop.Generated
 
         /// <summary>
         /// One-shot import from a legacy sqflite database.
-        /// Idempotent — skipped if KV flag "sqflite_imported = 1" is set.
+        /// Copies tracks, playlists, playlist_entries, deleted_tracks (v6
+        /// tombstones), and sync_state (v6 cursors). Idempotent via KV flags
+        /// "sqflite_imported" and "sqflite_imported_v6"; devices that already ran
+        /// the legacy import get a v6 backfill of tombstone/sync_state only.
         /// <paramref name="oldDbPath"/> must be a null-terminated UTF-8 path.
-        /// Returns a JSON summary {"already_done":bool,"tracks":n,"playlists":n,"entries":n}
+        /// Returns a JSON summary
+        /// {"already_done":bool,"tracks":n,"playlists":n,"entries":n,"deleted_tracks":n,"sync_state":n}
         /// or "error:…". Caller must free the result.
         /// </summary>
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
         public static extern FfiString wdmm_library_import_from_sqflite(IntPtr oldDbPath);
+
+        /// <summary>
+        /// Compare the global library DB against an Android-schema sqflite DB.
+        /// Reads <paramref name="oldDbPath"/> read-only and compares the tracks,
+        /// deleted_tracks, and sync_state tables. Neither DB is mutated.
+        /// Returns a JSON CompareReport
+        /// {"tracks":{…},"deleted_tracks":{…},"sync_state":{…},"ok":bool}
+        /// or "error:…". Caller must free the result.
+        /// </summary>
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern FfiString wdmm_library_compare_with_sqflite(IntPtr oldDbPath);
 
         // ── Local HTTP proxy (proxy extract round) ───────────────────────────
 
@@ -670,10 +685,18 @@ namespace WdmmDesktop.Generated
             => wdmm_library_clear_index().ToStringAndFree();
 
         /// <summary>
-        /// One-shot import from a legacy sqflite DB. Returns a JSON summary.
+        /// One-shot import from a legacy sqflite DB (tracks, playlists, entries,
+        /// v6 tombstones + sync_state). Returns a JSON summary.
         /// </summary>
         public static string LibraryImportFromSqflite(string oldDbPath)
             => WithNativeString(oldDbPath, wdmm_library_import_from_sqflite);
+
+        /// <summary>
+        /// Compare the library DB against a legacy sqflite DB.
+        /// Returns a JSON CompareReport.
+        /// </summary>
+        public static string LibraryCompareWithSqflite(string oldDbPath)
+            => WithNativeString(oldDbPath, wdmm_library_compare_with_sqflite);
 
         // ── Proxy HLS wrappers ────────────────────────────────────────────────
 

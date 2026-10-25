@@ -111,6 +111,8 @@ Cast / DLNA locked rules (unchanged — mirrors Android):
 | `wdmm_cue_album_upsert` / `_slice_upsert` / `_slice_delete` / `_album_delete` / `_remaining_slices` | ✓ | NativeMethods (available; v5 cutover FFI; corrected ABI signatures in 42d0a90) |
 | `wdmm_deleted_track_upsert` / `_clear` / `_list` / `_unpushed` / `_mark_pushed` / `_purge_up_to` / `wdmm_tombstoned_remote_paths` | ✓ | NativeMethods (available; v6 tombstone FFI) |
 | `wdmm_sync_state_get` / `_save` / `_clear` | ✓ | NativeMethods (available; v6 sync_state FFI) |
+| `wdmm_library_import_from_sqflite` | ✓ | NativeMethods `LibraryImportFromSqflite` (v6: copies deleted_tracks + sync_state) |
+| `wdmm_library_compare_with_sqflite` | ✓ | NativeMethods `LibraryCompareWithSqflite` (available; compare report FFI) |
 
 ---
 
@@ -123,7 +125,7 @@ opt-in HTTP surface for external clients (Settings → 第三方/开发者).
 
 ## Submodule
 
-Current SHA pinned: **abc1f4a** (v6: deleted_tracks + sync_state tombstone tracking + per-remote sync cursors).
+Current SHA pinned: **e64108f** (import v6: `import_from_sqflite` copies deleted_tracks + sync_state with v6 backfill; new `wdmm_library_compare_with_sqflite` FFI).
 
 ---
 
