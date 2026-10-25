@@ -13,6 +13,10 @@ name: Testbuild
 
 on:
   workflow_dispatch:
+  # Feature-only workflow is not dispatchable until it also exists on default
+  # branch; push on this branch runs the file from the same commit.
+  push:
+    branches: [feat/desktop-shell-followup]
 
 permissions:
   contents: read
