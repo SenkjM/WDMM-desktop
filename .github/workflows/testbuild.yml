@@ -171,57 +171,59 @@ jobs:
           # Outer launcher (relative .cmd; no absolute paths survive in the zip).
           # Future MSI installs the same bin/ payload and uses its own shortcut,
           # so this launcher is portable-zip-only.
-          cat > "$STAGE/WDMM.cmd" << 'CMDEOF'
-@echo off
-rem WDMM Desktop portable launcher.
-rem Starts WdmmDesktop.exe from bin\ relative to this script.
-rem Do not move this file independently of the bin\ folder.
-start "" "%~dp0bin\WdmmDesktop.exe" %*
-CMDEOF
-          cat > "$STAGE/PORTABLE-README.txt" << 'READMEEOF'
-WDMM Desktop - Portable Testbuild
-==================================
-
-Layout
-------
-  WDMM.cmd                   Relative launcher (recommended entry point).
-                             Uses %~dp0 so the zip can be extracted anywhere.
-  PORTABLE-README.txt        This file.
-  bin\                       MSI-payload-shaped tree.
-    WdmmDesktop.exe          Application entry point.
-    lib\wdmm_ffi.dll         Rust FFI bridge DLL.
-                             Loaded via SetDllDirectoryW("lib") at startup;
-                             no PATH change required.
-    [all other *.dll]        See "DLLs at bin\ root" below.
-    Assets\                  App icon / image assets.
-
-DLLs at bin\ root (boot-critical -- must not be moved without deps.json update)
---------------------------------------------------------------------------------
-All *.dll files other than wdmm_ffi.dll remain at bin\ root because the
-.NET 8 self-contained publish writes a deps.json that references every
-framework and WinAppSDK assembly by its path relative to bin\.  Moving
-them to lib\ would require patching deps.json and is deferred.
-
-The following are especially critical:
-  hostfxr.dll / hostpolicy.dll             .NET host resolver + policy
-  coreclr.dll / clrjit.dll / clretwrc.dll  CLR, JIT, and ETW resources
-  Microsoft.WindowsAppRuntime.Bootstrap*.dll  WinAppSDK bootstrap
-  WdmmDesktop.dll                          Managed entry assembly
-  WdmmDesktop.runtimeconfig.json / WdmmDesktop.deps.json  Host config
-
-Managed assembly probing
-------------------------
-bin\lib is listed as probing privatePath in WdmmDesktop.exe.config.
-This is a no-op for the current self-contained layout (all assemblies are
-deps.json-referenced at bin\ root) but enables future managed assemblies
-placed in bin\lib\ to be found without further code changes.
-
-Future MSI note
----------------
-A future MSI/WiX installer will install the same bin\ directory tree as-is.
-The portable WDMM.cmd launcher is not needed in the installed layout;
-the MSI shortcut targets WdmmDesktop.exe directly.
-READMEEOF
+          # Heredoc bodies must stay indented in YAML (bare "@echo" breaks parse).
+          # Write files with printf so content has no leading spaces.
+          printf '%s\n' \
+            '@echo off' \
+            'rem WDMM Desktop portable launcher.' \
+            'rem Starts WdmmDesktop.exe from bin\ relative to this script.' \
+            'rem Do not move this file independently of the bin\ folder.' \
+            'start "" "%~dp0bin\WdmmDesktop.exe" %*' \
+            > "$STAGE/WDMM.cmd"
+          printf '%s\n' \
+            'WDMM Desktop - Portable Testbuild' \
+            '==================================' \
+            '' \
+            'Layout' \
+            '------' \
+            '  WDMM.cmd                   Relative launcher (recommended entry point).' \
+            '                             Uses %~dp0 so the zip can be extracted anywhere.' \
+            '  PORTABLE-README.txt        This file.' \
+            '  bin\                       MSI-payload-shaped tree.' \
+            '    WdmmDesktop.exe          Application entry point.' \
+            '    lib\wdmm_ffi.dll         Rust FFI bridge DLL.' \
+            '                             Loaded via SetDllDirectoryW("lib") at startup;' \
+            '                             no PATH change required.' \
+            '    [all other *.dll]        See "DLLs at bin\ root" below.' \
+            '    Assets\                  App icon / image assets.' \
+            '' \
+            'DLLs at bin\ root (boot-critical -- must not be moved without deps.json update)' \
+            '--------------------------------------------------------------------------------' \
+            'All *.dll files other than wdmm_ffi.dll remain at bin\ root because the' \
+            '.NET 8 self-contained publish writes a deps.json that references every' \
+            'framework and WinAppSDK assembly by its path relative to bin\.  Moving' \
+            'them to lib\ would require patching deps.json and is deferred.' \
+            '' \
+            'The following are especially critical:' \
+            '  hostfxr.dll / hostpolicy.dll             .NET host resolver + policy' \
+            '  coreclr.dll / clrjit.dll / clretwrc.dll  CLR, JIT, and ETW resources' \
+            '  Microsoft.WindowsAppRuntime.Bootstrap*.dll  WinAppSDK bootstrap' \
+            '  WdmmDesktop.dll                          Managed entry assembly' \
+            '  WdmmDesktop.runtimeconfig.json / WdmmDesktop.deps.json  Host config' \
+            '' \
+            'Managed assembly probing' \
+            '------------------------' \
+            'bin\lib is listed as probing privatePath in WdmmDesktop.exe.config.' \
+            'This is a no-op for the current self-contained layout (all assemblies are' \
+            'deps.json-referenced at bin\ root) but enables future managed assemblies' \
+            'placed in bin\lib\ to be found without further code changes.' \
+            '' \
+            'Future MSI note' \
+            '---------------' \
+            'A future MSI/WiX installer will install the same bin\ directory tree as-is.' \
+            'The portable WDMM.cmd launcher is not needed in the installed layout;' \
+            'the MSI shortcut targets WdmmDesktop.exe directly.' \
+            > "$STAGE/PORTABLE-README.txt"
           echo "FOLDER_NAME=$FOLDER_NAME" >> "$GITHUB_ENV"
           echo "Portable layout staged at: $STAGE"
           echo "  WDMM.cmd            : $([ -f "$STAGE/WDMM.cmd"             ] && echo OK || echo MISSING)"
