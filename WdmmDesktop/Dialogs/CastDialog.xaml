@@ -115,7 +115,7 @@
                                     </Grid.ColumnDefinitions>
 
                                         <StackPanel Grid.Column="0" Spacing="3" VerticalAlignment="Center">
-                                            <TextBlock Text="{Binding FriendlyName}"
+                                            <TextBlock Text="{Binding DisplayName}"
                                                        FontSize="13"
                                                        FontWeight="SemiBold"
                                                        TextTrimming="CharacterEllipsis" />

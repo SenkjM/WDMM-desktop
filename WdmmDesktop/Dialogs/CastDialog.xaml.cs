@@ -7,6 +7,7 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
 using WdmmDesktop.Generated;
 using WdmmDesktop.Models;
+using WdmmDesktop.Services;
 
 namespace WdmmDesktop.Dialogs
 {
@@ -28,7 +29,8 @@ namespace WdmmDesktop.Dialogs
         public CastDialog(TrackItem? pendingTrack = null)
         {
             InitializeComponent();
-            _prefs = LocalStore.LoadDmrPrefs();
+            DmrPrefsStore.EnsureInit();
+            _prefs = DmrPrefsStore.LoadAll();
 
             if (pendingTrack != null)
             {
@@ -89,7 +91,13 @@ namespace WdmmDesktop.Dialogs
             }
             EmptyState.Visibility = Visibility.Collapsed;
             foreach (var d in _devices)
+            {
+                if (_prefs.TryGetValue(d.Usn, out var pref) && !string.IsNullOrWhiteSpace(pref.OverrideName))
+                    d.DisplayName = pref.OverrideName!;
+                else
+                    d.DisplayName = d.FriendlyName;
                 DmrList.Items.Add(d);
+            }
         }
 
         // ── Per-DMR compat toggle ─────────────────────────────────────────────
@@ -97,10 +105,12 @@ namespace WdmmDesktop.Dialogs
         private void CompatToggle_Click(object sender, RoutedEventArgs e)
         {
             if (sender is not ToggleButton tb || tb.DataContext is not DmrDevice dev) return;
-            if (!_prefs.TryGetValue(dev.Usn, out var pref)) pref = new DmrPref();
+            if (!_prefs.TryGetValue(dev.Usn, out var pref))
+                pref = new DmrPref { Usn = dev.Usn };
+            pref.Usn = dev.Usn;
             pref.ForceDirect = tb.IsChecked != true;
             _prefs[dev.Usn] = pref;
-            LocalStore.SaveDmrPrefs(_prefs);
+            DmrPrefsStore.Upsert(pref);
         }
 
         // ── Info dialog ───────────────────────────────────────────────────────
@@ -109,8 +119,13 @@ namespace WdmmDesktop.Dialogs
         {
             if (sender is not Button btn || btn.DataContext is not DmrDevice dev) return;
             _prefs.TryGetValue(dev.Usn, out var pref);
-            var dlg = new DmrInfoDialog(dev, pref ?? new DmrPref()) { XamlRoot = this.XamlRoot };
+            var dlg = new DmrInfoDialog(dev, pref ?? new DmrPref { Usn = dev.Usn }) { XamlRoot = this.XamlRoot };
             await dlg.ShowAsync();
+            if (dlg.SavedPref != null)
+            {
+                _prefs[dev.Usn] = dlg.SavedPref;
+                ApplyDevices();
+            }
         }
 
         // ── Cast ──────────────────────────────────────────────────────────────
@@ -140,7 +155,8 @@ namespace WdmmDesktop.Dialogs
                 if (proxyUrl.StartsWith("error:"))
                     SetStatus(proxyUrl, isError: true);
                 else
-                    SetStatus($"Casting {System.IO.Path.GetFileName(filePath)} → {dev.FriendlyName}", isError: false);
+                    var label = string.IsNullOrEmpty(dev.DisplayName) ? dev.FriendlyName : dev.DisplayName;
+                    SetStatus($"Casting {System.IO.Path.GetFileName(filePath)} → {label}", isError: false);
             }
             catch (Exception ex)
             {

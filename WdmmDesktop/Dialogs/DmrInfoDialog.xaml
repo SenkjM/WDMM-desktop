@@ -5,8 +5,9 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:local="using:WdmmDesktop.Dialogs"
     Title="Renderer Info"
+    PrimaryButtonText="Save"
     CloseButtonText="Close"
-    DefaultButton="Close">
+    DefaultButton="Primary">
 
     <ContentDialog.Resources>
         <AcrylicBrush x:Key="DialogAcrylicBrush"
@@ -18,74 +19,44 @@
     <Border Background="{StaticResource DialogAcrylicBrush}"
             CornerRadius="8"
             Padding="4">
-        <StackPanel Spacing="14" Width="380">
+        <StackPanel Spacing="14" Width="400">
 
-            <!-- Friendly name -->
             <StackPanel Spacing="4">
-                <TextBlock Text="Friendly Name"
-                           FontSize="11"
-                           Opacity="0.55"
-                           FontWeight="SemiBold" />
-                <TextBlock x:Name="FriendlyNameText"
-                           FontSize="14"
-                           FontWeight="SemiBold"
-                           TextWrapping="Wrap" />
+                <TextBlock Text="Discovered name" FontSize="11" Opacity="0.55" FontWeight="SemiBold" />
+                <TextBlock x:Name="FriendlyNameText" FontSize="14" FontWeight="SemiBold" TextWrapping="Wrap" />
             </StackPanel>
 
-            <!-- USN -->
             <StackPanel Spacing="4">
-                <TextBlock Text="USN (Unique Service Name)"
-                           FontSize="11"
-                           Opacity="0.55"
-                           FontWeight="SemiBold" />
-                <TextBox x:Name="UsnText"
-                         IsReadOnly="True"
-                         FontFamily="Cascadia Mono,Consolas,monospace"
-                         FontSize="11"
-                         TextWrapping="Wrap" />
+                <TextBlock Text="Override display name" FontSize="11" Opacity="0.55" FontWeight="SemiBold" />
+                <TextBox x:Name="OverrideNameBox" PlaceholderText="Leave empty to use discovered name" />
             </StackPanel>
 
-            <!-- Description URL -->
             <StackPanel Spacing="4">
-                <TextBlock Text="Description URL (Location)"
-                           FontSize="11"
-                           Opacity="0.55"
-                           FontWeight="SemiBold" />
-                <TextBox x:Name="LocationText"
-                         IsReadOnly="True"
-                         FontSize="12"
-                         TextWrapping="Wrap" />
+                <TextBlock Text="USN (Unique Service Name)" FontSize="11" Opacity="0.55" FontWeight="SemiBold" />
+                <TextBox x:Name="UsnText" IsReadOnly="True"
+                         FontFamily="Cascadia Mono,Consolas,monospace" FontSize="11" TextWrapping="Wrap" />
             </StackPanel>
 
-            <!-- AVTransport URL -->
             <StackPanel Spacing="4">
-                <TextBlock Text="AVTransport Control URL"
-                           FontSize="11"
-                           Opacity="0.55"
-                           FontWeight="SemiBold" />
-                <TextBox x:Name="AvTransportText"
-                         IsReadOnly="True"
-                         FontSize="12"
-                         TextWrapping="Wrap" />
+                <TextBlock Text="Description URL (Location)" FontSize="11" Opacity="0.55" FontWeight="SemiBold" />
+                <TextBox x:Name="LocationText" IsReadOnly="True" FontSize="12" TextWrapping="Wrap" />
             </StackPanel>
 
-            <!-- Compat pref -->
-            <Border Background="{ThemeResource LayerFillColorDefaultBrush}"
-                    CornerRadius="6"
-                    Padding="10,8">
-                <StackPanel Spacing="4">
-                    <TextBlock Text="Cast mode preference"
-                               FontSize="11"
-                               Opacity="0.55"
-                               FontWeight="SemiBold" />
-                    <TextBlock x:Name="CompatText"
-                               FontSize="12"
-                               TextWrapping="Wrap" />
-                    <TextBlock FontSize="10"
-                               Opacity="0.4"
-                               TextWrapping="Wrap"
+            <StackPanel Spacing="4">
+                <TextBlock Text="AVTransport Control URL" FontSize="11" Opacity="0.55" FontWeight="SemiBold" />
+                <TextBox x:Name="AvTransportText" IsReadOnly="True" FontSize="12" TextWrapping="Wrap" />
+            </StackPanel>
+
+            <Border Background="{ThemeResource LayerFillColorDefaultBrush}" CornerRadius="6" Padding="10,8">
+                <StackPanel Spacing="8">
+                    <ToggleSwitch x:Name="ForceDirectToggle" Header="Force direct (off = HLS)"
+                                  MinWidth="0" Toggled="ForceDirectToggle_Toggled" />
+                    <TextBlock x:Name="CompatText" FontSize="12" TextWrapping="Wrap" />
+                    <TextBlock FontSize="10" Opacity="0.4" TextWrapping="Wrap"
                                FontFamily="Cascadia Mono,Consolas,monospace"
-                               Text="Change via the compat toggle on the Cast page. Preference is keyed by USN and persisted locally." />
+                               Text="Prefs keyed by USN in Core dmr_prefs.db (wdmm_dmr_prefs_*)." />
+                    <TextBlock x:Name="SaveErrorText" FontSize="11" Visibility="Collapsed"
+                               Foreground="{ThemeResource SystemFillColorCriticalBrush}" TextWrapping="Wrap" />
                 </StackPanel>
             </Border>
 

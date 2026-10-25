@@ -7,8 +7,9 @@ using System.Text.Json.Serialization;
 namespace WdmmDesktop
 {
     /// <summary>
-    /// Local JSON for Desktop-only prefs (desktop_prefs, DMR until Core prefs land).
-    /// Cloud sources use <see cref="Services.AccountStore"/> / wdmm_account_* — not accounts.json.
+    /// Local JSON for Desktop-only prefs (desktop_prefs).
+    /// Cloud sources: AccountStore / wdmm_account_*. DMR prefs: DmrPrefsStore / wdmm_dmr_prefs_*
+    /// (LoadDmrPrefs retained only for one-shot migrate from legacy dmr_prefs.json).
     /// </summary>
     internal static class LocalStore
     {
@@ -54,10 +55,8 @@ namespace WdmmDesktop
             }
         }
 
+        /// <summary>Legacy read for migrate-only. New writes go through DmrPrefsStore.</summary>
         public static Dictionary<string, Models.DmrPref> LoadDmrPrefs() =>
             Load("dmr_prefs.json", new Dictionary<string, Models.DmrPref>());
-
-        public static void SaveDmrPrefs(Dictionary<string, Models.DmrPref> prefs) =>
-            Save("dmr_prefs.json", prefs);
     }
 }

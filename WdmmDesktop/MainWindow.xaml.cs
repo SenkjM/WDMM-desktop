@@ -94,6 +94,7 @@ namespace WdmmDesktop
                     "Wdmm");
                 Directory.CreateDirectory(dbDir);
                 NativeMethods.LibraryInit(Path.Combine(dbDir, "library.db"));
+                DmrPrefsStore.EnsureInit();
             }
             catch { /* FFI not loaded (Linux dev box) — tolerate */ }
         }
