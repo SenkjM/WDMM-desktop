@@ -1609,6 +1609,16 @@ namespace WdmmDesktop.Generated
             }
         }
 
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern FfiString wdmm_covers_configure(IntPtr musicCoversDir, IntPtr mangaCoversDir);
+
+        public static string CoversConfigure(string musicCoversDir, string mangaCoversDir)
+        {
+            var p1 = Utf8Z(musicCoversDir); var p2 = Utf8Z(mangaCoversDir);
+            try { return wdmm_covers_configure(p1, p2).ToStringAndFree(); }
+            finally { Marshal.FreeHGlobal(p1); Marshal.FreeHGlobal(p2); }
+        }
+
         // ── Driver registry (Phase 0 Wave C) ──────────────────────────────────
 
         /// <summary>

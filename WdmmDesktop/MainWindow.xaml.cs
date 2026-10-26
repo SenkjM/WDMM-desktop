@@ -95,6 +95,13 @@ namespace WdmmDesktop
                 Directory.CreateDirectory(dbDir);
                 NativeMethods.LibraryInit(Path.Combine(dbDir, "library.db"));
                 DmrPrefsStore.EnsureInit();
+
+                // Configure Core cover roots so backup create/restore/upload/download see them.
+                var musicCovers = Path.Combine(dbDir, "covers");
+                var mangaCovers = Path.Combine(dbDir, "manga_cache", "covers");
+                Directory.CreateDirectory(musicCovers);
+                Directory.CreateDirectory(mangaCovers);
+                NativeMethods.CoversConfigure(musicCovers, mangaCovers);
             }
             catch { /* FFI not loaded (Linux dev box) — tolerate */ }
         }
