@@ -129,6 +129,18 @@ namespace WdmmDesktop.Generated
             IntPtr remoteDir);
 
         /// <summary>
+        /// Trigger a full rebuild sync run (credentials + library + playlists).
+        /// All parameters are null-terminated UTF-8 strings.
+        /// Returns a JSON summary or "error:…". Caller must free the result.
+        /// </summary>
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern FfiString wdmm_sync_full(
+            IntPtr webdavUrl,
+            IntPtr webdavUser,
+            IntPtr webdavPass,
+            IntPtr remoteDir);
+
+        /// <summary>
         /// Trigger a sync run with managed strings. Returns a JSON summary
         /// or "error:…". Never throws on FFI load failure (Linux dev box tolerated).
         /// </summary>
@@ -150,6 +162,38 @@ namespace WdmmDesktop.Generated
                 Marshal.Copy(b3, 0, p3, b3.Length);
                 Marshal.Copy(b4, 0, p4, b4.Length);
                 return wdmm_sync_trigger(p1, p2, p3, p4).ToStringAndFree();
+            }
+            finally
+            {
+                Marshal.FreeHGlobal(p1);
+                Marshal.FreeHGlobal(p2);
+                Marshal.FreeHGlobal(p3);
+                Marshal.FreeHGlobal(p4);
+            }
+        }
+
+        /// <summary>
+        /// Trigger a full rebuild sync run with managed strings. Returns a JSON summary
+        /// or "error:…". Never throws on FFI load failure (Linux dev box tolerated).
+        /// </summary>
+        public static string WithNativeSyncFull(
+            string webdavUrl, string webdavUser, string webdavPass, string remoteDir)
+        {
+            var b1 = System.Text.Encoding.UTF8.GetBytes(webdavUrl + '\0');
+            var b2 = System.Text.Encoding.UTF8.GetBytes(webdavUser + '\0');
+            var b3 = System.Text.Encoding.UTF8.GetBytes(webdavPass + '\0');
+            var b4 = System.Text.Encoding.UTF8.GetBytes(remoteDir + '\0');
+            var p1 = Marshal.AllocHGlobal(b1.Length);
+            var p2 = Marshal.AllocHGlobal(b2.Length);
+            var p3 = Marshal.AllocHGlobal(b3.Length);
+            var p4 = Marshal.AllocHGlobal(b4.Length);
+            try
+            {
+                Marshal.Copy(b1, 0, p1, b1.Length);
+                Marshal.Copy(b2, 0, p2, b2.Length);
+                Marshal.Copy(b3, 0, p3, b3.Length);
+                Marshal.Copy(b4, 0, p4, b4.Length);
+                return wdmm_sync_full(p1, p2, p3, p4).ToStringAndFree();
             }
             finally
             {

@@ -200,6 +200,27 @@ namespace WdmmDesktop.Dialogs
             ShowInlineStatus(SyncStatusText, result, isError: result.StartsWith("error:"));
         }
 
+        private void TriggerSyncFullBtn_Click(object sender, RoutedEventArgs e)
+        {
+            var acc = SyncSourceCombo?.SelectedItem as WebDavAccount;
+            var url = acc?.Url?.Trim() ?? "";
+            var user = acc?.Username ?? "";
+            var pass = acc?.Password ?? "";
+            var dir = string.IsNullOrWhiteSpace(SyncRemoteDirBox?.Text) ? "/wdmm-sync" : SyncRemoteDirBox.Text.Trim();
+            _prefs.SyncRemoteDir = dir;
+            LocalStore.Save(PrefsFile, _prefs);
+            try { NativeMethods.KvSet("sync_remote_root", dir); } catch { }
+            if (string.IsNullOrEmpty(url))
+            {
+                ShowInlineStatus(SyncStatusText, "请先在文件源中添加源", isError: true);
+                return;
+            }
+            string result;
+            try { result = NativeMethods.WithNativeSyncFull(url, user, pass, dir); }
+            catch (Exception ex) { result = "error:" + ex.Message; }
+            ShowInlineStatus(SyncStatusText, result, isError: result.StartsWith("error:"));
+        }
+
         private void SaveSyncBtn_Click(object sender, RoutedEventArgs e)
         {
             var errs = new System.Text.StringBuilder();

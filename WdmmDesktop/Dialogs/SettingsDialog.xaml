@@ -259,6 +259,7 @@
                                 <Button x:Name="SaveSyncBtn" Click="SaveSyncBtn_Click" Content="保存设置"
                                         Style="{StaticResource AccentButtonStyle}" Padding="16,8" />
                                 <Button x:Name="TriggerSyncBtn" Click="TriggerSyncBtn_Click" Content="立即同步" Padding="16,8" />
+                                <Button x:Name="TriggerSyncFullBtn" Click="TriggerSyncFullBtn_Click" Content="完整重建" Padding="16,8" />
                             </StackPanel>
                             <TextBlock x:Name="SyncStatusText" FontSize="11" TextWrapping="Wrap" Visibility="Collapsed" />
 
