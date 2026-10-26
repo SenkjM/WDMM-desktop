@@ -378,6 +378,72 @@ namespace WdmmDesktop.Generated
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
         public static extern FfiString wdmm_library_compare_with_sqflite(IntPtr oldDbPath);
 
+        // ── Schema v7+v8 — Aggregates + FTS5 ──────────────────────────────────
+
+        /// <summary>
+        /// List all artists (schema v7 aggregate).
+        /// Returns a JSON array of {"name":"...","track_count":N} objects,
+        /// or "error:...". Caller must free the result.
+        /// </summary>
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern FfiString wdmm_artist_list();
+
+        /// <summary>
+        /// Get one artist by name (schema v7 aggregate).
+        /// <paramref name="name"/> must be a null-terminated UTF-8 string.
+        /// Returns a JSON object {"name":"...","track_count":N}, "null" if absent,
+        /// or "error:...". Caller must free the result.
+        /// </summary>
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern FfiString wdmm_artist_get(IntPtr name);
+
+        /// <summary>
+        /// List all albums (schema v7 aggregate).
+        /// Returns a JSON array of {"title":"...","album_artist":"...","track_count":N} objects,
+        /// or "error:...". Caller must free the result.
+        /// </summary>
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern FfiString wdmm_album_list();
+
+        /// <summary>
+        /// Get one album by title (schema v7 aggregate).
+        /// <paramref name="title"/> must be a null-terminated UTF-8 string.
+        /// Returns a JSON object {"title":"...","album_artist":"...","track_count":N}, "null" if absent,
+        /// or "error:...". Caller must free the result.
+        /// </summary>
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern FfiString wdmm_album_get(IntPtr title);
+
+        /// <summary>
+        /// List tracks by artist name (schema v7 aggregate).
+        /// <paramref name="name"/> must be a null-terminated UTF-8 string.
+        /// Returns a JSON array of track objects, or "error:...". Caller must free the result.
+        /// </summary>
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern FfiString wdmm_tracks_by_artist(IntPtr name);
+
+        /// <summary>
+        /// List tracks by album title (schema v7 aggregate).
+        /// <paramref name="title"/> must be a null-terminated UTF-8 string.
+        /// Returns a JSON array of track objects, or "error:...". Caller must free the result.
+        /// </summary>
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern FfiString wdmm_tracks_by_album(IntPtr title);
+
+        /// <summary>
+        /// Rebuild artist and album aggregates from the tracks table.
+        /// Returns "ok" or "error:...". Caller must free the result.
+        /// </summary>
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern FfiString wdmm_library_rebuild_aggregates();
+
+        /// <summary>
+        /// Rebuild FTS5 search index from the tracks table (schema v8).
+        /// Returns "ok" or "error:...". Caller must free the result.
+        /// </summary>
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern FfiString wdmm_library_rebuild_fts();
+
         // ── Local HTTP proxy (proxy extract round) ───────────────────────────
 
         /// <summary>
@@ -697,6 +763,64 @@ namespace WdmmDesktop.Generated
         /// </summary>
         public static string LibraryCompareWithSqflite(string oldDbPath)
             => WithNativeString(oldDbPath, wdmm_library_compare_with_sqflite);
+
+        // ── Schema v7+v8 — Aggregates + FTS5 convenience wrappers ─────────────
+
+        /// <summary>
+        /// List all artists (schema v7 aggregate).
+        /// Returns a JSON array of {"name":"...","track_count":N} objects.
+        /// </summary>
+        public static string ArtistList()
+            => wdmm_artist_list().ToStringAndFree();
+
+        /// <summary>
+        /// Get one artist by name (schema v7 aggregate).
+        /// Returns a JSON object, "null" if absent, or "error:...".
+        /// </summary>
+        public static string ArtistGet(string name)
+            => WithNativeString(name, wdmm_artist_get);
+
+        /// <summary>
+        /// List all albums (schema v7 aggregate).
+        /// Returns a JSON array of {"title":"...","album_artist":"...","track_count":N} objects.
+        /// </summary>
+        public static string AlbumList()
+            => wdmm_album_list().ToStringAndFree();
+
+        /// <summary>
+        /// Get one album by title (schema v7 aggregate).
+        /// Returns a JSON object, "null" if absent, or "error:...".
+        /// </summary>
+        public static string AlbumGet(string title)
+            => WithNativeString(title, wdmm_album_get);
+
+        /// <summary>
+        /// List tracks by artist name (schema v7 aggregate).
+        /// Returns a JSON array of track objects.
+        /// </summary>
+        public static string TracksByArtist(string name)
+            => WithNativeString(name, wdmm_tracks_by_artist);
+
+        /// <summary>
+        /// List tracks by album title (schema v7 aggregate).
+        /// Returns a JSON array of track objects.
+        /// </summary>
+        public static string TracksByAlbum(string title)
+            => WithNativeString(title, wdmm_tracks_by_album);
+
+        /// <summary>
+        /// Rebuild artist and album aggregates from the tracks table.
+        /// Returns "ok" or "error:...".
+        /// </summary>
+        public static string LibraryRebuildAggregates()
+            => wdmm_library_rebuild_aggregates().ToStringAndFree();
+
+        /// <summary>
+        /// Rebuild FTS5 search index from the tracks table (schema v8).
+        /// Returns "ok" or "error:...".
+        /// </summary>
+        public static string LibraryRebuildFts()
+            => wdmm_library_rebuild_fts().ToStringAndFree();
 
         // ── Proxy HLS wrappers ────────────────────────────────────────────────
 
