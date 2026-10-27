@@ -216,7 +216,8 @@ namespace WdmmDesktop.Dialogs
                 return;
             }
             string result;
-            try { result = NativeMethods.WithNativeSyncFull(url, user, pass, dir); }
+            var withCovers = SyncFullWithCoversCheck?.IsChecked == true;
+            try { result = NativeMethods.WithNativeSyncFull(url, user, pass, dir, withCovers); }
             catch (Exception ex) { result = "error:" + ex.Message; }
             ShowInlineStatus(SyncStatusText, result, isError: result.StartsWith("error:"));
         }

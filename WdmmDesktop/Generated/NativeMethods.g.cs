@@ -138,7 +138,8 @@ namespace WdmmDesktop.Generated
             IntPtr webdavUrl,
             IntPtr webdavUser,
             IntPtr webdavPass,
-            IntPtr remoteDir);
+            IntPtr remoteDir,
+            int withCovers);
 
         /// <summary>
         /// Trigger a sync run with managed strings. Returns a JSON summary
@@ -177,7 +178,8 @@ namespace WdmmDesktop.Generated
         /// or "error:…". Never throws on FFI load failure (Linux dev box tolerated).
         /// </summary>
         public static string WithNativeSyncFull(
-            string webdavUrl, string webdavUser, string webdavPass, string remoteDir)
+            string webdavUrl, string webdavUser, string webdavPass, string remoteDir,
+            bool withCovers = false)
         {
             var b1 = System.Text.Encoding.UTF8.GetBytes(webdavUrl + '\0');
             var b2 = System.Text.Encoding.UTF8.GetBytes(webdavUser + '\0');
@@ -193,7 +195,7 @@ namespace WdmmDesktop.Generated
                 Marshal.Copy(b2, 0, p2, b2.Length);
                 Marshal.Copy(b3, 0, p3, b3.Length);
                 Marshal.Copy(b4, 0, p4, b4.Length);
-                return wdmm_sync_full(p1, p2, p3, p4).ToStringAndFree();
+                return wdmm_sync_full(p1, p2, p3, p4, withCovers ? 1 : 0).ToStringAndFree();
             }
             finally
             {

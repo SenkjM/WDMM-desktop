@@ -260,6 +260,9 @@
                                         Style="{StaticResource AccentButtonStyle}" Padding="16,8" />
                                 <Button x:Name="TriggerSyncBtn" Click="TriggerSyncBtn_Click" Content="立即同步" Padding="16,8" />
                                 <Button x:Name="TriggerSyncFullBtn" Click="TriggerSyncFullBtn_Click" Content="完整重建" Padding="16,8" />
+                                <CheckBox x:Name="SyncFullWithCoversCheck" Content="带封面" IsChecked="False"
+                                          VerticalAlignment="Center"
+                                          ToolTipService.ToolTip="重建时将封面文件嵌入 lib-* 基础分片（SEC_COVERS）；增量同步不受影响" />
                             </StackPanel>
                             <TextBlock x:Name="SyncStatusText" FontSize="11" TextWrapping="Wrap" Visibility="Collapsed" />
 
