@@ -10,6 +10,10 @@ namespace WdmmDesktop.Models
         [JsonPropertyName("album")]         public string Album { get; set; } = "";
         [JsonPropertyName("path")]          public string Path { get; set; } = "";
         [JsonPropertyName("duration_secs")] public double DurationSecs { get; set; }
+        /// <summary>Core cover_state: 0 unknown / 1 none / 2 present. Not a path.</summary>
+        [JsonPropertyName("cover_state")]  public int CoverStateValue { get; set; }
+        [JsonIgnore] public CoverState CoverState =>
+            CoverStateValue switch { 1 => CoverState.None, 2 => CoverState.Present, _ => CoverState.Unknown };
 
         /// <summary>Formatted MM:SS duration, or "" if unknown.</summary>
         [JsonIgnore]

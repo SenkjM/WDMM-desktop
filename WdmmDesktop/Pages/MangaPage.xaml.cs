@@ -234,6 +234,7 @@ namespace WdmmDesktop.Pages
                         ["volume"] = item.Volume,
                         ["chapter_number"] = item.ChapterNumber,
                         ["page_count"] = item.PageCount,
+                        ["cover_state"] = item.CoverStateValue,
                         ["format"] = item.Format,
                         ["source_name"] = item.SourceName,
                         ["remote_path"] = item.RemotePath,

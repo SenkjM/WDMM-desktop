@@ -15,6 +15,10 @@ namespace WdmmDesktop.Models
         [JsonPropertyName("volume")]         public string? Volume { get; set; }
         [JsonPropertyName("chapter_number")] public string? ChapterNumber { get; set; }
         [JsonPropertyName("page_count")]     public long PageCount { get; set; }
+        /// <summary>Core cover_state: 0 unknown / 1 none / 2 present. Not a path.</summary>
+        [JsonPropertyName("cover_state")]   public int CoverStateValue { get; set; }
+        [JsonIgnore] public CoverState CoverState =>
+            CoverStateValue switch { 1 => CoverState.None, 2 => CoverState.Present, _ => CoverState.Unknown };
         [JsonPropertyName("format")]         public string Format { get; set; } = "";
         [JsonPropertyName("source_name")]    public string SourceName { get; set; } = "";
         [JsonPropertyName("remote_path")]    public string RemotePath { get; set; } = "";
