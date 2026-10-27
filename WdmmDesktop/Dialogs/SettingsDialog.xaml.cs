@@ -533,6 +533,57 @@ namespace WdmmDesktop.Dialogs
                 isError: errs.Length > 0);
         }
 
+        // ── Wave 8: Import from sqflite library.db ────────────────────────────
+
+        private string? _importDbPath;
+
+        private async void ImportBrowseBtn_Click(object sender, RoutedEventArgs e)
+        {
+            var picker = new Windows.Storage.Pickers.FileOpenPicker();
+            picker.SuggestedStartLocation = Windows.Storage.Pickers.PickerLocationId.Downloads;
+            picker.FileTypeFilter.Add(".db");
+            picker.FileTypeFilter.Add("*");
+
+            var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(App.MainWindow);
+            WinRT.Interop.InitializeWithWindow.Initialize(picker, hwnd);
+
+            var file = await picker.PickSingleFileAsync();
+            if (file == null) return;
+
+            _importDbPath = file.Path;
+            ImportPathText.Text       = file.Path;
+            ImportPathText.Visibility = Visibility.Visible;
+            ImportStatusText.Visibility = Visibility.Collapsed;
+        }
+
+        private void ImportRunBtn_Click(object sender, RoutedEventArgs e)
+        {
+            if (string.IsNullOrEmpty(_importDbPath))
+            {
+                ShowInlineStatus(ImportStatusText, "请先选择数据库文件。", isError: true);
+                return;
+            }
+
+            ImportRunBtn.IsEnabled = false;
+            try
+            {
+                var result = NativeMethods.LibraryImportFromSqflite(_importDbPath);
+                ShowInlineStatus(ImportStatusText,
+                    result.StartsWith("error:", StringComparison.Ordinal)
+                        ? $"导入失败：{result[6..]}"
+                        : "导入完成。",
+                    isError: result.StartsWith("error:", StringComparison.Ordinal));
+            }
+            catch (Exception ex)
+            {
+                ShowInlineStatus(ImportStatusText, $"导入失败：{ex.Message}", isError: true);
+            }
+            finally
+            {
+                ImportRunBtn.IsEnabled = true;
+            }
+        }
+
         // ── Section 3: 文件源 (KV-backed) ─────────────────────────────────────
 
         private void SaveNetwork2Btn_Click(object sender, RoutedEventArgs e)

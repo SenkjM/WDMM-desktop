@@ -9,7 +9,9 @@
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
         <!-- Source + actions -->
@@ -30,6 +32,7 @@
                 <Button x:Name="UpBtn" Click="UpBtn_Click" Content="上级" Padding="10,6" IsEnabled="False" />
                 <Button x:Name="RefreshBtn" Click="RefreshBtn_Click" Content="刷新" Padding="10,6" />
                 <Button x:Name="NewFolderBtn" Click="NewFolderBtn_Click" Content="新建文件夹" Padding="10,6" />
+                <Button x:Name="UploadBtn" Click="UploadBtn_Click" Content="上传…" Padding="10,6" Visibility="Collapsed" />
             </StackPanel>
         </Grid>
 
@@ -42,11 +45,33 @@
                    Text="/"
                    TextWrapping="Wrap" />
 
+        <!-- Multi-select batch toolbar (hidden until items selected) -->
+        <StackPanel x:Name="BatchToolbar"
+                    Grid.Row="2"
+                    Orientation="Horizontal"
+                    Spacing="6"
+                    Visibility="Collapsed">
+            <Button x:Name="SelectAllBtn" Click="SelectAllBtn_Click" Content="全选" Padding="8,5" />
+            <Button x:Name="BatchDownloadBtn" Click="BatchDownloadBtn_Click" Content="下载所选" Padding="8,5" />
+            <Button x:Name="BatchAddMangaBtn" Click="BatchAddMangaBtn_Click" Content="入漫画库" Padding="8,5" />
+            <Button x:Name="BatchDeleteBtn" Click="BatchDeleteBtn_Click" Content="删除所选" Padding="8,5" />
+            <TextBlock x:Name="SelectionCountText"
+                       VerticalAlignment="Center"
+                       FontSize="12"
+                       Opacity="0.6"
+                       Margin="4,0,0,0" />
+        </StackPanel>
+
         <!-- Body -->
-        <Grid Grid.Row="2">
+        <Grid Grid.Row="3">
             <ListView x:Name="EntryList"
-                      DoubleTapped="EntryList_DoubleTapped"
-                      SelectionMode="Single">
+                      IsItemClickEnabled="True"
+                      ItemClick="EntryList_ItemClick"
+                      SelectionMode="Extended"
+                      SelectionChanged="EntryList_SelectionChanged">
+                <ListView.KeyboardAccelerators>
+                    <KeyboardAccelerator Key="A" Modifiers="Control" Invoked="SelectAllAccelerator_Invoked" />
+                </ListView.KeyboardAccelerators>
                 <ListView.ItemTemplate>
                     <DataTemplate>
                         <Grid ColumnSpacing="10" Padding="4,6">
@@ -70,9 +95,14 @@
                     </DataTemplate>
                 </ListView.ItemTemplate>
                 <ListView.ContextFlyout>
-                    <MenuFlyout>
-                        <MenuFlyoutItem x:Name="CtxRename" Text="重命名" Click="CtxRename_Click" />
-                        <MenuFlyoutItem x:Name="CtxDelete" Text="删除" Click="CtxDelete_Click" />
+                    <MenuFlyout Opening="ContextMenu_Opening">
+                        <MenuFlyoutItem x:Name="CtxDownload"  Text="下载"          Click="CtxDownload_Click" />
+                        <MenuFlyoutItem x:Name="CtxViewImage" Text="查看图片"       Click="CtxViewImage_Click" />
+                        <MenuFlyoutItem x:Name="CtxAddManga"  Text="添加到漫画库"   Click="CtxAddManga_Click" />
+                        <MenuFlyoutItem x:Name="CtxCast"      Text="投屏"          Click="CtxCast_Click" />
+                        <MenuFlyoutSeparator />
+                        <MenuFlyoutItem x:Name="CtxRename"    Text="重命名"         Click="CtxRename_Click" />
+                        <MenuFlyoutItem x:Name="CtxDelete"    Text="删除"          Click="CtxDelete_Click" />
                     </MenuFlyout>
                 </ListView.ContextFlyout>
             </ListView>
@@ -89,5 +119,12 @@
             <ProgressRing x:Name="BusyRing" Width="36" Height="36" IsActive="False" Visibility="Collapsed"
                           HorizontalAlignment="Center" VerticalAlignment="Center" />
         </Grid>
+
+        <!-- Status / action feedback -->
+        <TextBlock x:Name="ActionStatus"
+                   Grid.Row="4"
+                   FontSize="11"
+                   Opacity="0.55"
+                   TextTrimming="CharacterEllipsis" />
     </Grid>
 </Page>

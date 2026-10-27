@@ -4,13 +4,19 @@ using System.Text.Json;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Navigation;
+using WdmmDesktop.Dialogs;
 using WdmmDesktop.Generated;
 using WdmmDesktop.Models;
-using WdmmDesktop.Dialogs;
-using WdmmDesktop;
+using WdmmDesktop.Services;
 
 namespace WdmmDesktop.Pages
 {
+    /// <summary>
+    /// Music library page with three tabs: Tracks / Albums / Artists.
+    /// Wave 5: Albums and Artists tabs backed by AlbumList/ArtistList/TracksByAlbum/TracksByArtist FFI.
+    /// No playback — Cast is the only audio action.
+    /// Empty-state text uses Loc keys (Wave i18n fix).
+    /// </summary>
     public sealed partial class MusicPage : Page
     {
         private List<TrackItem> _allTracks = new();
@@ -21,8 +27,16 @@ namespace WdmmDesktop.Pages
         protected override void OnNavigatedTo(NavigationEventArgs e)
         {
             base.OnNavigatedTo(e);
+            ApplyTabLabels();
             EnsureLibraryInit();
             LoadTracks(query: null);
+        }
+
+        private void ApplyTabLabels()
+        {
+            TabTracks.Content  = Loc.Get("Music.Tracks");
+            TabAlbums.Content  = Loc.Get("Music.Albums");
+            TabArtists.Content = Loc.Get("Music.Artists");
         }
 
         // ── Library init ──────────────────────────────────────────────────────
@@ -42,7 +56,23 @@ namespace WdmmDesktop.Pages
             catch { /* FFI not loaded on Linux dev box — tolerate */ }
         }
 
-        // ── Data loading ──────────────────────────────────────────────────────
+        // ── Tab switching ─────────────────────────────────────────────────────
+
+        private void MusicTab_Checked(object sender, RoutedEventArgs e)
+        {
+            if (sender is not RadioButton rb) return;
+            var tag = rb.Tag?.ToString() ?? "Tracks";
+
+            PanelTracks.Visibility  = tag == "Tracks"  ? Visibility.Visible : Visibility.Collapsed;
+            PanelAlbums.Visibility  = tag == "Albums"  ? Visibility.Visible : Visibility.Collapsed;
+            PanelArtists.Visibility = tag == "Artists" ? Visibility.Visible : Visibility.Collapsed;
+            SearchRow.Visibility    = tag == "Tracks"  ? Visibility.Visible : Visibility.Collapsed;
+
+            if (tag == "Albums")  LoadAlbums();
+            if (tag == "Artists") LoadArtists();
+        }
+
+        // ── Tracks tab ────────────────────────────────────────────────────────
 
         private void LoadTracks(string? query)
         {
@@ -51,29 +81,25 @@ namespace WdmmDesktop.Pages
                 var json = string.IsNullOrWhiteSpace(query)
                     ? NativeMethods.TrackList()
                     : NativeMethods.TrackSearch(query);
-
                 _allTracks = JsonSerializer.Deserialize<List<TrackItem>>(json)
                              ?? new List<TrackItem>();
             }
             catch
             {
-                // FFI not loaded or library not yet initialised — show empty state.
                 _allTracks = new List<TrackItem>();
             }
-
-            ApplyList(_allTracks, query);
+            ApplyTrackList(_allTracks, query);
         }
 
-        private void ApplyList(List<TrackItem> tracks, string? query)
+        private void ApplyTrackList(List<TrackItem> tracks, string? query)
         {
             TrackList.Items.Clear();
-
             if (tracks.Count == 0)
             {
                 EmptyState.Visibility = Visibility.Visible;
                 EmptyText.Text = string.IsNullOrWhiteSpace(query)
-                    ? "No tracks in library. Sync from Network page to populate."
-                    : $"No results for \"{query}\"";
+                    ? Loc.Get("Music.EmptyLibrary")
+                    : $"{Loc.Get("Music.EmptyLibrary")} (no results for \"{query}\")";
                 StatusBar.Text = "";
             }
             else
@@ -87,7 +113,118 @@ namespace WdmmDesktop.Pages
             }
         }
 
-        // ── Events ────────────────────────────────────────────────────────────
+        // ── Albums tab (Wave 5) ───────────────────────────────────────────────
+
+        private void LoadAlbums()
+        {
+            AlbumList.Items.Clear();
+            AlbumTrackList.Items.Clear();
+            AlbumEmptyState.Visibility = Visibility.Collapsed;
+
+            try
+            {
+                var json = NativeMethods.AlbumList();
+                if (json.StartsWith("error:", StringComparison.Ordinal)) return;
+
+                // AlbumList returns JSON array of strings (album titles).
+                var albums = JsonSerializer.Deserialize<List<string>>(json) ?? new List<string>();
+                foreach (var a in albums)
+                    if (!string.IsNullOrEmpty(a))
+                        AlbumList.Items.Add(a);
+
+                if (AlbumList.Items.Count == 0)
+                {
+                    AlbumEmptyState.Visibility = Visibility.Visible;
+                    AlbumEmptyText.Text = Loc.Get("Music.EmptyLibrary");
+                }
+            }
+            catch { }
+        }
+
+        private void AlbumList_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (AlbumList.SelectedItem is not string album) return;
+
+            AlbumTrackList.Items.Clear();
+            AlbumEmptyState.Visibility = Visibility.Collapsed;
+            try
+            {
+                var json = NativeMethods.TracksByAlbum(album);
+                if (json.StartsWith("error:", StringComparison.Ordinal)) return;
+
+                var tracks = JsonSerializer.Deserialize<List<TrackItem>>(json) ?? new List<TrackItem>();
+                foreach (var t in tracks)
+                    AlbumTrackList.Items.Add(t);
+
+                if (tracks.Count == 0)
+                {
+                    AlbumEmptyState.Visibility = Visibility.Visible;
+                    AlbumEmptyText.Text = "No tracks for this album.";
+                }
+                else
+                {
+                    StatusBar.Text = $"{tracks.Count} track{(tracks.Count == 1 ? "" : "s")} in "{album}"";
+                }
+            }
+            catch { }
+        }
+
+        // ── Artists tab (Wave 5) ──────────────────────────────────────────────
+
+        private void LoadArtists()
+        {
+            ArtistList.Items.Clear();
+            ArtistTrackList.Items.Clear();
+            ArtistEmptyState.Visibility = Visibility.Collapsed;
+
+            try
+            {
+                var json = NativeMethods.ArtistList();
+                if (json.StartsWith("error:", StringComparison.Ordinal)) return;
+
+                var artists = JsonSerializer.Deserialize<List<string>>(json) ?? new List<string>();
+                foreach (var a in artists)
+                    if (!string.IsNullOrEmpty(a))
+                        ArtistList.Items.Add(a);
+
+                if (ArtistList.Items.Count == 0)
+                {
+                    ArtistEmptyState.Visibility = Visibility.Visible;
+                    ArtistEmptyText.Text = Loc.Get("Music.EmptyLibrary");
+                }
+            }
+            catch { }
+        }
+
+        private void ArtistList_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (ArtistList.SelectedItem is not string artist) return;
+
+            ArtistTrackList.Items.Clear();
+            ArtistEmptyState.Visibility = Visibility.Collapsed;
+            try
+            {
+                var json = NativeMethods.TracksByArtist(artist);
+                if (json.StartsWith("error:", StringComparison.Ordinal)) return;
+
+                var tracks = JsonSerializer.Deserialize<List<TrackItem>>(json) ?? new List<TrackItem>();
+                foreach (var t in tracks)
+                    ArtistTrackList.Items.Add(t);
+
+                if (tracks.Count == 0)
+                {
+                    ArtistEmptyState.Visibility = Visibility.Visible;
+                    ArtistEmptyText.Text = "No tracks for this artist.";
+                }
+                else
+                {
+                    StatusBar.Text = $"{tracks.Count} track{(tracks.Count == 1 ? "" : "s")} by "{artist}"";
+                }
+            }
+            catch { }
+        }
+
+        // ── Tracks tab events ─────────────────────────────────────────────────
 
         private void RefreshBtn_Click(object sender, RoutedEventArgs e)
         {
@@ -100,8 +237,7 @@ namespace WdmmDesktop.Pages
             if (args.Reason == AutoSuggestionBoxTextChangeReason.UserInput
                 && string.IsNullOrWhiteSpace(sender.Text))
             {
-                // User cleared the box — restore full list.
-                ApplyList(_allTracks, query: null);
+                ApplyTrackList(_allTracks, query: null);
             }
         }
 
@@ -115,13 +251,7 @@ namespace WdmmDesktop.Pages
         {
             if (sender is Button btn && btn.Tag is TrackItem track)
             {
-                // Open the Cast dialog with the selected track — no sidebar navigation.
-                // Casting is a transient device-picker flow, not a primary destination
-                // (Android parity: no Cast drawer entry).
-                var dialog = new CastDialog(track)
-                {
-                    XamlRoot = XamlRoot
-                };
+                var dialog = new CastDialog(track) { XamlRoot = XamlRoot };
                 await dialog.ShowAsync();
             }
         }

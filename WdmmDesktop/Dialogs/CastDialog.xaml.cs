@@ -40,6 +40,24 @@ namespace WdmmDesktop.Dialogs
             }
         }
 
+        /// <summary>
+        /// Open CastDialog pre-filled with a network (cloud) file path.
+        /// Wave 9: called from NetworkPage CtxCast_Click when the user wants to cast a
+        /// remote file directly.  SourceBox is set to the cloud path; ProxyRegisterStream
+        /// is not wired (cast of a cloud path requires stream proxy, which is out of scope
+        /// for this delivery — the user can manually adjust the URL after opening the dialog).
+        /// </summary>
+        public CastDialog(string cloudFilePath, string displayName)
+        {
+            InitializeComponent();
+            DmrPrefsStore.EnsureInit();
+            _prefs = DmrPrefsStore.LoadAll();
+
+            SourceBox.Text               = cloudFilePath;
+            PendingTrackText.Text        = displayName;
+            PendingTrackBadge.Visibility = Visibility.Visible;
+        }
+
         // ── Pending track badge ───────────────────────────────────────────────
 
         private void ClearPendingBtn_Click(object sender, RoutedEventArgs e)

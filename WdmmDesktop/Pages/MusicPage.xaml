@@ -9,12 +9,13 @@
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <!-- Search bar + refresh -->
-        <Grid Grid.Row="0" Margin="12,10,12,6">
+        <!-- Search bar + refresh (tracks tab only) -->
+        <Grid x:Name="SearchRow" Grid.Row="0" Margin="12,10,12,6">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
@@ -35,72 +36,239 @@
             </Button>
         </Grid>
 
-        <!-- Track list -->
-        <ListView x:Name="TrackList"
-                  Grid.Row="1"
-                  Margin="12,0,12,0"
-                  SelectionMode="Single">
-            <ListView.ItemTemplate>
-                <DataTemplate>
-                    <Grid Padding="4,4" ColumnSpacing="8">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-
-                        <!-- Title + sub-line -->
-                        <StackPanel Grid.Column="0" Spacing="2" VerticalAlignment="Center">
-                            <TextBlock Text="{Binding Title}"
-                                       FontSize="13"
-                                       FontWeight="SemiBold"
-                                       TextTrimming="CharacterEllipsis" />
-                            <TextBlock Text="{Binding SubLine}"
-                                       FontSize="11"
-                                       Opacity="0.55"
-                                       TextTrimming="CharacterEllipsis" />
-                        </StackPanel>
-
-                        <!-- Duration -->
-                        <TextBlock Grid.Column="1"
-                                   Text="{Binding DurationDisplay}"
-                                   FontSize="11"
-                                   Opacity="0.5"
-                                   VerticalAlignment="Center"
-                                   FontFamily="Cascadia Mono,Consolas,monospace" />
-
-                        <!-- Cast button: Tag="{Binding}" passes TrackItem to click handler -->
-                        <Button Grid.Column="2"
-                                Click="CastBtn_Click"
-                                Tag="{Binding}"
-                                Background="Transparent"
-                                BorderThickness="0"
-                                ToolTipService.ToolTip="Cast to DLNA renderer"
-                                Padding="8,6">
-                            <FontIcon Glyph="&#xE93E;" FontSize="14" />
-                        </Button>
-                    </Grid>
-                </DataTemplate>
-            </ListView.ItemTemplate>
-        </ListView>
-
-        <!-- Empty / error state -->
-        <StackPanel x:Name="EmptyState"
-                    Grid.Row="1"
-                    VerticalAlignment="Center"
-                    HorizontalAlignment="Center"
-                    Spacing="8"
-                    Visibility="Collapsed">
-            <FontIcon Glyph="&#xE8D6;" FontSize="40" Opacity="0.3" />
-            <TextBlock x:Name="EmptyText"
-                       FontSize="13"
-                       Opacity="0.5"
-                       HorizontalAlignment="Center" />
+        <!-- Tab strip -->
+        <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="12,0,12,4" Spacing="2">
+            <RadioButton x:Name="TabTracks"
+                         GroupName="MusicTab"
+                         Content="曲目"
+                         IsChecked="True"
+                         Checked="MusicTab_Checked"
+                         Tag="Tracks"
+                         Padding="10,6" />
+            <RadioButton x:Name="TabAlbums"
+                         GroupName="MusicTab"
+                         Content="专辑"
+                         Checked="MusicTab_Checked"
+                         Tag="Albums"
+                         Padding="10,6" />
+            <RadioButton x:Name="TabArtists"
+                         GroupName="MusicTab"
+                         Content="艺人"
+                         Checked="MusicTab_Checked"
+                         Tag="Artists"
+                         Padding="10,6" />
         </StackPanel>
+
+        <!-- Tracks panel -->
+        <Grid x:Name="PanelTracks" Grid.Row="2">
+            <ListView x:Name="TrackList"
+                      Margin="12,0,12,0"
+                      SelectionMode="Single">
+                <ListView.ItemTemplate>
+                    <DataTemplate>
+                        <Grid Padding="4,4" ColumnSpacing="8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+
+                            <!-- Title + sub-line -->
+                            <StackPanel Grid.Column="0" Spacing="2" VerticalAlignment="Center">
+                                <TextBlock Text="{Binding Title}"
+                                           FontSize="13"
+                                           FontWeight="SemiBold"
+                                           TextTrimming="CharacterEllipsis" />
+                                <TextBlock Text="{Binding SubLine}"
+                                           FontSize="11"
+                                           Opacity="0.55"
+                                           TextTrimming="CharacterEllipsis" />
+                            </StackPanel>
+
+                            <!-- Duration -->
+                            <TextBlock Grid.Column="1"
+                                       Text="{Binding DurationDisplay}"
+                                       FontSize="11"
+                                       Opacity="0.5"
+                                       VerticalAlignment="Center"
+                                       FontFamily="Cascadia Mono,Consolas,monospace" />
+
+                            <!-- Cast button: Tag="{Binding}" passes TrackItem to click handler -->
+                            <Button Grid.Column="2"
+                                    Click="CastBtn_Click"
+                                    Tag="{Binding}"
+                                    Background="Transparent"
+                                    BorderThickness="0"
+                                    ToolTipService.ToolTip="Cast to DLNA renderer"
+                                    Padding="8,6">
+                                <FontIcon Glyph="&#xE93E;" FontSize="14" />
+                            </Button>
+                        </Grid>
+                    </DataTemplate>
+                </ListView.ItemTemplate>
+            </ListView>
+
+            <!-- Empty / error state -->
+            <StackPanel x:Name="EmptyState"
+                        VerticalAlignment="Center"
+                        HorizontalAlignment="Center"
+                        Spacing="8"
+                        Visibility="Collapsed">
+                <FontIcon Glyph="&#xE8D6;" FontSize="40" Opacity="0.3" />
+                <TextBlock x:Name="EmptyText"
+                           FontSize="13"
+                           Opacity="0.5"
+                           HorizontalAlignment="Center" />
+            </StackPanel>
+        </Grid>
+
+        <!-- Albums panel -->
+        <Grid x:Name="PanelAlbums" Grid.Row="2" Visibility="Collapsed">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="240" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <ListView x:Name="AlbumList"
+                      Grid.Column="0"
+                      Margin="12,0,0,0"
+                      SelectionMode="Single"
+                      SelectionChanged="AlbumList_SelectionChanged">
+                <ListView.ItemTemplate>
+                    <DataTemplate>
+                        <Grid Padding="4,6" ColumnSpacing="8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <FontIcon Glyph="&#xE8B7;" FontSize="14" Opacity="0.6" />
+                            <TextBlock Grid.Column="1"
+                                       Text="{Binding}"
+                                       FontSize="13"
+                                       TextTrimming="CharacterEllipsis"
+                                       VerticalAlignment="Center" />
+                        </Grid>
+                    </DataTemplate>
+                </ListView.ItemTemplate>
+            </ListView>
+            <Grid Grid.Column="1" Margin="12,0,12,0">
+                <ListView x:Name="AlbumTrackList"
+                          SelectionMode="Single">
+                    <ListView.ItemTemplate>
+                        <DataTemplate>
+                            <Grid Padding="4,4" ColumnSpacing="8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0" Spacing="1" VerticalAlignment="Center">
+                                    <TextBlock Text="{Binding Title}"
+                                               FontSize="13"
+                                               FontWeight="SemiBold"
+                                               TextTrimming="CharacterEllipsis" />
+                                    <TextBlock Text="{Binding SubLine}"
+                                               FontSize="11"
+                                               Opacity="0.55"
+                                               TextTrimming="CharacterEllipsis" />
+                                </StackPanel>
+                                <TextBlock Grid.Column="1"
+                                           Text="{Binding DurationDisplay}"
+                                           FontSize="11"
+                                           Opacity="0.5"
+                                           VerticalAlignment="Center"
+                                           FontFamily="Cascadia Mono,Consolas,monospace" />
+                            </Grid>
+                        </DataTemplate>
+                    </ListView.ItemTemplate>
+                </ListView>
+                <StackPanel x:Name="AlbumEmptyState"
+                            VerticalAlignment="Center"
+                            HorizontalAlignment="Center"
+                            Spacing="6"
+                            Visibility="Collapsed">
+                    <FontIcon Glyph="&#xE8D6;" FontSize="32" Opacity="0.25" />
+                    <TextBlock x:Name="AlbumEmptyText"
+                               FontSize="12"
+                               Opacity="0.45"
+                               HorizontalAlignment="Center" />
+                </StackPanel>
+            </Grid>
+        </Grid>
+
+        <!-- Artists panel -->
+        <Grid x:Name="PanelArtists" Grid.Row="2" Visibility="Collapsed">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="240" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <ListView x:Name="ArtistList"
+                      Grid.Column="0"
+                      Margin="12,0,0,0"
+                      SelectionMode="Single"
+                      SelectionChanged="ArtistList_SelectionChanged">
+                <ListView.ItemTemplate>
+                    <DataTemplate>
+                        <Grid Padding="4,6" ColumnSpacing="8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <FontIcon Glyph="&#xE779;" FontSize="14" Opacity="0.6" />
+                            <TextBlock Grid.Column="1"
+                                       Text="{Binding}"
+                                       FontSize="13"
+                                       TextTrimming="CharacterEllipsis"
+                                       VerticalAlignment="Center" />
+                        </Grid>
+                    </DataTemplate>
+                </ListView.ItemTemplate>
+            </ListView>
+            <Grid Grid.Column="1" Margin="12,0,12,0">
+                <ListView x:Name="ArtistTrackList"
+                          SelectionMode="Single">
+                    <ListView.ItemTemplate>
+                        <DataTemplate>
+                            <Grid Padding="4,4" ColumnSpacing="8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0" Spacing="1" VerticalAlignment="Center">
+                                    <TextBlock Text="{Binding Title}"
+                                               FontSize="13"
+                                               FontWeight="SemiBold"
+                                               TextTrimming="CharacterEllipsis" />
+                                    <TextBlock Text="{Binding SubLine}"
+                                               FontSize="11"
+                                               Opacity="0.55"
+                                               TextTrimming="CharacterEllipsis" />
+                                </StackPanel>
+                                <TextBlock Grid.Column="1"
+                                           Text="{Binding DurationDisplay}"
+                                           FontSize="11"
+                                           Opacity="0.5"
+                                           VerticalAlignment="Center"
+                                           FontFamily="Cascadia Mono,Consolas,monospace" />
+                            </Grid>
+                        </DataTemplate>
+                    </ListView.ItemTemplate>
+                </ListView>
+                <StackPanel x:Name="ArtistEmptyState"
+                            VerticalAlignment="Center"
+                            HorizontalAlignment="Center"
+                            Spacing="6"
+                            Visibility="Collapsed">
+                    <FontIcon Glyph="&#xE8D6;" FontSize="32" Opacity="0.25" />
+                    <TextBlock x:Name="ArtistEmptyText"
+                               FontSize="12"
+                               Opacity="0.45"
+                               HorizontalAlignment="Center" />
+                </StackPanel>
+            </Grid>
+        </Grid>
 
         <!-- Status bar -->
         <TextBlock x:Name="StatusBar"
-                   Grid.Row="2"
+                   Grid.Row="3"
                    Margin="14,4,14,10"
                    FontSize="11"
                    Opacity="0.45" />

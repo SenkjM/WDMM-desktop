@@ -168,15 +168,16 @@ namespace WdmmDesktop.Pages
 
         // ── Events ────────────────────────────────────────────────────────────
 
-        private void ItemsList_DoubleTapped(object sender, DoubleTappedRoutedEventArgs e)
+        private void ItemsList_ItemClick(object sender, ItemClickEventArgs e)
         {
-            if (ItemsList.SelectedItem is FolderDisplayRow row)
+            if (e.ClickedItem is FolderDisplayRow row)
                 NavigateTo(row.FolderId, row.Name);
+            // ItemDisplayRow: no navigation action — item detail shown inline via buttons
         }
 
         private void ItemsList_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            // Selection used only to highlight; double-tap enters folder.
+            // Selection used only to highlight; ItemClick enters folders.
         }
 
         // ── New folder ────────────────────────────────────────────────────────
