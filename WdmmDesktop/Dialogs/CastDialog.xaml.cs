@@ -22,9 +22,16 @@ namespace WdmmDesktop.Dialogs
         // CastPage was removed in Wave C — this dialog is the sole owner.
         private static string? _activeProxyToken;
         private static bool    _activeTokenIsHls;
+        // Active stream GCHandle — kept alive for proxy callback lifetime.
+        private static GCHandle _activeStreamHandle;
 
         private List<DmrDevice> _devices = new();
         private Dictionary<string, DmrPref> _prefs = new();
+
+        // Cloud cast fields — populated by the cloud constructor; empty for local/track casts.
+        private string _cloudAccountId  = "";
+        private string _cloudRemotePath = "";
+        private ulong  _cloudFileSize   = 0;
 
         public CastDialog(TrackItem? pendingTrack = null)
         {
@@ -41,17 +48,20 @@ namespace WdmmDesktop.Dialogs
         }
 
         /// <summary>
-        /// Open CastDialog pre-filled with a network (cloud) file path.
-        /// Wave 9: called from NetworkPage CtxCast_Click when the user wants to cast a
-        /// remote file directly.  SourceBox is set to the cloud path; ProxyRegisterStream
-        /// is not wired (cast of a cloud path requires stream proxy, which is out of scope
-        /// for this delivery — the user can manually adjust the URL after opening the dialog).
+        /// Open CastDialog pre-filled for casting a cloud/network file.
+        /// Wave 9: called from NetworkPage CtxCast_Click.
+        /// Uses ProxyRegisterStream + WdmmProxyRangeCallback that Range-reads the cloud
+        /// file via wdmm_account_read_range — mirrors Android DlnaCastService.readRange.
         /// </summary>
-        public CastDialog(string cloudFilePath, string displayName)
+        public CastDialog(string accountId, string cloudFilePath, ulong fileSize, string displayName)
         {
             InitializeComponent();
             DmrPrefsStore.EnsureInit();
             _prefs = DmrPrefsStore.LoadAll();
+
+            _cloudAccountId  = accountId;
+            _cloudRemotePath = cloudFilePath;
+            _cloudFileSize   = fileSize;
 
             SourceBox.Text               = cloudFilePath;
             PendingTrackText.Text        = displayName;
@@ -191,35 +201,22 @@ namespace WdmmDesktop.Dialogs
         /// <summary>
         /// Core proxy-cast flow (background thread).
         /// Locked rules: DLNA→proxy only; single-file mutex; no auto HLS↔direct fallback.
+        /// Cloud casts (Wave 9) use ProxyRegisterStream + a Range callback that reads the
+        /// cloud file via wdmm_account_read_range; local casts use ProxyRegisterFile/Hls.
         /// </summary>
-        private static string PerformProxyCast(string filePath, DmrDevice dev, bool forceDirect)
+        private string PerformProxyCast(string filePath, DmrDevice dev, bool forceDirect)
         {
             try
             {
-                // Infer ContentDeliveryKind.
-                var kind = filePath.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
-                           filePath.StartsWith("https://", StringComparison.OrdinalIgnoreCase)
-                    ? Models.ContentDeliveryKind.NetworkDirect
-                    : Models.ContentDeliveryKind.LocalFile;
+                // Cloud cast path: when _cloudAccountId is set, the source is a remote
+                // cloud file. Range-read it via wdmm_account_read_range and serve through
+                // a proxy stream — mirrors Android DlnaCastService.readRange.
+                var isCloudCast = !string.IsNullOrEmpty(_cloudAccountId)
+                                  && !string.IsNullOrEmpty(_cloudRemotePath)
+                                  && string.Equals(filePath, _cloudRemotePath, StringComparison.Ordinal);
 
-                if (kind == Models.ContentDeliveryKind.LocalStream)
-                    return "error: LocalStream cast not available — no cloud/crypt drivers on desktop.";
-
-                if (kind == Models.ContentDeliveryKind.NetworkDirect)
-                    return "error: NetworkDirect source has no local file. Cast a local file or cache it first.";
-
-                // Single-file mutex: unregister previous token.
-                if (!string.IsNullOrEmpty(_activeProxyToken))
-                {
-                    try
-                    {
-                        if (_activeTokenIsHls) NativeMethods.ProxyUnregisterHls(_activeProxyToken);
-                        else                   NativeMethods.ProxyUnregister(_activeProxyToken);
-                    }
-                    catch { }
-                    _activeProxyToken = null;
-                    _activeTokenIsHls = false;
-                }
+                // Single-file mutex: unregister previous token + release stream handle.
+                ReleaseActiveRegistration();
 
                 var proxyStartResult = NativeMethods.ProxyStart(0);
                 if (proxyStartResult.StartsWith("error:")) return proxyStartResult;
@@ -227,7 +224,24 @@ namespace WdmmDesktop.Dialogs
                 string token, urlPath;
                 int    port;
 
-                if (forceDirect)
+                if (isCloudCast)
+                {
+                    var ctx = new CloudStreamCtx(_cloudAccountId, _cloudRemotePath);
+                    _activeStreamHandle = GCHandle.Alloc(ctx, GCHandleType.Normal);
+                    var cb = new WdmmProxyRangeCallback(CloudRangeCallback);
+
+                    var regJson = NativeMethods.ProxyRegisterStream(
+                        _cloudFileSize, System.IO.Path.GetFileName(_cloudRemotePath),
+                        cb, GCHandle.ToIntPtr(_activeStreamHandle));
+                    if (regJson.StartsWith("error:")) return regJson;
+                    using var doc = JsonDocument.Parse(regJson);
+                    var root      = doc.RootElement;
+                    token         = root.GetProperty("token").GetString()        ?? "";
+                    urlPath       = root.GetProperty("path_template").GetString() ?? "";
+                    port          = root.GetProperty("port").GetInt32();
+                    _activeTokenIsHls = false;
+                }
+                else if (forceDirect)
                 {
                     var regJson = NativeMethods.ProxyRegisterFile(filePath, System.IO.Path.GetFileName(filePath));
                     if (regJson.StartsWith("error:")) return regJson;
@@ -283,6 +297,76 @@ namespace WdmmDesktop.Dialogs
 
         // ── Helpers ───────────────────────────────────────────────────────────
 
+        /// <summary>
+        /// Release the active proxy registration + stream GCHandle.
+        /// Must be called on the same thread as PerformProxyCast (background Task.Run).
+        /// </summary>
+        private static void ReleaseActiveRegistration()
+        {
+            if (!string.IsNullOrEmpty(_activeProxyToken))
+            {
+                try
+                {
+                    if (_activeTokenIsHls) NativeMethods.ProxyUnregisterHls(_activeProxyToken);
+                    else                   NativeMethods.ProxyUnregister(_activeProxyToken);
+                }
+                catch { }
+                _activeProxyToken = null;
+                _activeTokenIsHls = false;
+            }
+            if (_activeStreamHandle.IsAllocated)
+            {
+                try { _activeStreamHandle.Free(); } catch { }
+            }
+        }
+
+        /// <summary>
+        /// WdmmProxyRangeCallback for cloud casts (async path).
+        /// Spawns a Task that calls wdmm_account_read_range and delivers the buffer
+        /// via wdmm_proxy_stream_set_result — mirrors Android RustProxyStreamBridge.
+        /// </summary>
+        private static int CloudRangeCallback(
+            IntPtr userData, long start, long end,
+            out IntPtr outBuf, out nuint outLen,
+            ulong requestId)
+        {
+            // Async path: return 0 immediately, deliver bytes on a worker thread.
+            outBuf = IntPtr.Zero;
+            outLen = 0;
+
+            var gch = GCHandle.FromIntPtr(userData);
+            if (!gch.IsAllocated || gch.Target is not CloudStreamCtx ctx)
+            {
+                NativeMethods.wdmm_proxy_stream_set_result(requestId, IntPtr.Zero, 0, -1);
+                return 0;
+            }
+
+            var s = (ulong)Math.Max(0, start);
+            // end == -1 from proxy means "to EOF"; map to u64::MAX sentinel
+            var e = end < 0 ? ulong.MaxValue : (ulong)end;
+
+            var capturedId    = ctx.AccountId;
+            var capturedPath  = ctx.RemotePath;
+            var capturedReqId = requestId;
+
+            System.Threading.Tasks.Task.Run(() =>
+            {
+                try
+                {
+                    int rc = NativeMethods.AccountReadRange(
+                        capturedId, capturedPath, s, e,
+                        out IntPtr buf, out nuint len);
+                    NativeMethods.wdmm_proxy_stream_set_result(capturedReqId, buf, len, rc);
+                }
+                catch
+                {
+                    NativeMethods.wdmm_proxy_stream_set_result(capturedReqId, IntPtr.Zero, 0, -1);
+                }
+            });
+
+            return 0; // async: result delivered via wdmm_proxy_stream_set_result
+        }
+
         private void SetStatus(string message, bool isError)
         {
             if (string.IsNullOrEmpty(message)) { CastStatus.Visibility = Visibility.Collapsed; return; }
@@ -291,6 +375,21 @@ namespace WdmmDesktop.Dialogs
                 ? (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["SystemFillColorCriticalBrush"]
                 : (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["TextFillColorPrimaryBrush"];
             CastStatus.Visibility = Visibility.Visible;
+        }
+    }
+
+    /// <summary>
+    /// Context bag pinned in the GCHandle for the lifetime of a cloud proxy stream.
+    /// Holds the account ID and remote path needed by CloudRangeCallback.
+    /// </summary>
+    internal sealed class CloudStreamCtx
+    {
+        public string AccountId  { get; }
+        public string RemotePath { get; }
+        public CloudStreamCtx(string accountId, string remotePath)
+        {
+            AccountId  = accountId;
+            RemotePath = remotePath;
         }
     }
 }

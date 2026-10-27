@@ -1802,6 +1802,30 @@ namespace WdmmDesktop.Generated
             finally { Marshal.FreeHGlobal(p1); Marshal.FreeHGlobal(p2); }
         }
 
+        /// <summary>
+        /// Read byte range [start, endInclusive] from a cloud account file.
+        /// endInclusive == ulong.MaxValue → read to end of file.
+        /// On success returns 0 and sets outBuf (Rust-heap; free with wdmm_proxy_stream_free_buf
+        /// or pass directly to wdmm_proxy_stream_set_result which takes ownership) and outLen.
+        /// Returns -1 on error, outBuf=null, outLen=0.
+        /// </summary>
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern unsafe int wdmm_account_read_range(
+            IntPtr accountId, IntPtr path,
+            ulong start, ulong endInclusive,
+            out IntPtr outBuf, out nuint outLen);
+
+        /// <summary>Managed convenience overload — marshals strings; returns result code.</summary>
+        public static unsafe int AccountReadRange(
+            string accountId, string path,
+            ulong start, ulong endInclusive,
+            out IntPtr outBuf, out nuint outLen)
+        {
+            var p1 = Utf8Z(accountId); var p2 = Utf8Z(path);
+            try   { return wdmm_account_read_range(p1, p2, start, endInclusive, out outBuf, out outLen); }
+            finally { Marshal.FreeHGlobal(p1); Marshal.FreeHGlobal(p2); }
+        }
+
         // ── Queue concurrency convenience wrappers ────────────────────────────
 
         /// <summary>Return the current queue concurrency limit (1–8).</summary>

@@ -534,10 +534,13 @@ namespace WdmmDesktop.Pages
         private async void CtxCast_Click(object sender, RoutedEventArgs e)
         {
             if (EntryList.SelectedItem is not RemoteEntry ent || ent.IsDir) return;
-            var dialog = new CastDialog(cloudFilePath: ent.Path, displayName: ent.Name)
-            {
-                XamlRoot = XamlRoot
-            };
+            // Wave 9: pass accountId + file size so CastDialog can use ProxyRegisterStream
+            // with a range callback that reads the cloud file via wdmm_account_read_range.
+            var accountId = _current?.Id ?? "";
+            var dialog = string.IsNullOrEmpty(accountId)
+                ? new CastDialog()
+                : new CastDialog(accountId, ent.Path, ent.Size, ent.Name);
+            dialog.XamlRoot = XamlRoot;
             await dialog.ShowAsync();
         }
 
