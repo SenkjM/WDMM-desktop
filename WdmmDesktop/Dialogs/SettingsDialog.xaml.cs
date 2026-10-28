@@ -52,9 +52,6 @@ namespace WdmmDesktop.Dialogs
             public bool   RememberNetworkPath { get; set; } = true;
             public string Theme { get; set; } = "Default";
             public string? SyncRemoteDir { get; set; }
-            public string? SyncUrl { get; set; }
-            public string? SyncUser { get; set; }
-            public string? SyncPass { get; set; }
             // Bind mode / port are OpenAPI (third-party) prefs, kept here too.
             public int    OpenApiPort { get; set; } = 8080;
             public int    BindMode { get; set; } = 0;
@@ -182,20 +179,18 @@ namespace WdmmDesktop.Dialogs
         private void TriggerSyncBtn_Click(object sender, RoutedEventArgs e)
         {
             var acc = SyncSourceCombo?.SelectedItem as WebDavAccount;
-            var url = acc?.Url?.Trim() ?? "";
-            var user = acc?.Username ?? "";
-            var pass = acc?.Password ?? "";
+            var accountId = acc?.Id ?? "";
             var dir = string.IsNullOrWhiteSpace(SyncRemoteDirBox?.Text) ? "/wdmm-sync" : SyncRemoteDirBox.Text.Trim();
             _prefs.SyncRemoteDir = dir;
             LocalStore.Save(PrefsFile, _prefs);
             try { NativeMethods.KvSet("sync_remote_root", dir); } catch { }
-            if (string.IsNullOrEmpty(url))
+            if (string.IsNullOrEmpty(accountId))
             {
                 ShowInlineStatus(SyncStatusText, "请先在文件源中添加源", isError: true);
                 return;
             }
             string result;
-            try { result = NativeMethods.WithNativeSyncTrigger(url, user, pass, dir); }
+            try { result = NativeMethods.WithNativeSyncTrigger(accountId, dir); }
             catch (Exception ex) { result = "error:" + ex.Message; }
             ShowInlineStatus(SyncStatusText, result, isError: result.StartsWith("error:"));
         }
@@ -203,21 +198,19 @@ namespace WdmmDesktop.Dialogs
         private void TriggerSyncFullBtn_Click(object sender, RoutedEventArgs e)
         {
             var acc = SyncSourceCombo?.SelectedItem as WebDavAccount;
-            var url = acc?.Url?.Trim() ?? "";
-            var user = acc?.Username ?? "";
-            var pass = acc?.Password ?? "";
+            var accountId = acc?.Id ?? "";
             var dir = string.IsNullOrWhiteSpace(SyncRemoteDirBox?.Text) ? "/wdmm-sync" : SyncRemoteDirBox.Text.Trim();
             _prefs.SyncRemoteDir = dir;
             LocalStore.Save(PrefsFile, _prefs);
             try { NativeMethods.KvSet("sync_remote_root", dir); } catch { }
-            if (string.IsNullOrEmpty(url))
+            if (string.IsNullOrEmpty(accountId))
             {
                 ShowInlineStatus(SyncStatusText, "请先在文件源中添加源", isError: true);
                 return;
             }
             string result;
             var withCovers = SyncFullWithCoversCheck?.IsChecked == true;
-            try { result = NativeMethods.WithNativeSyncFull(url, user, pass, dir, withCovers); }
+            try { result = NativeMethods.WithNativeSyncFull(accountId, dir, withCovers); }
             catch (Exception ex) { result = "error:" + ex.Message; }
             ShowInlineStatus(SyncStatusText, result, isError: result.StartsWith("error:"));
         }

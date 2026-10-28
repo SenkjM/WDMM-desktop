@@ -114,96 +114,119 @@ namespace WdmmDesktop.Generated
             IntPtr passphrase,
             IntPtr datab64);
 
-        // ── Sync (Round 4) ────────────────────────────────────────────────────
+        // ── Sync (account_id-based) ───────────────────────────────────────────
 
-        /// <summary>
-        /// Trigger a Rust sync run (credentials + library + playlists).
-        /// All parameters are null-terminated UTF-8 strings.
-        /// Returns a JSON summary or "error:…". Caller must free the result.
-        /// </summary>
+        // Native: wdmm_sync_trigger(account_id, remote_dir) → FfiString
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
-        public static extern FfiString wdmm_sync_trigger(
-            IntPtr webdavUrl,
-            IntPtr webdavUser,
-            IntPtr webdavPass,
-            IntPtr remoteDir);
+        public static extern FfiString wdmm_sync_trigger(IntPtr accountId, IntPtr remoteDir);
 
-        /// <summary>
-        /// Trigger a full rebuild sync run (credentials + library + playlists).
-        /// All parameters are null-terminated UTF-8 strings.
-        /// Returns a JSON summary or "error:…". Caller must free the result.
-        /// </summary>
+        // Native: wdmm_sync_full(account_id, remote_dir, with_covers) → FfiString
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
-        public static extern FfiString wdmm_sync_full(
-            IntPtr webdavUrl,
-            IntPtr webdavUser,
-            IntPtr webdavPass,
-            IntPtr remoteDir,
-            int withCovers);
+        public static extern FfiString wdmm_sync_full(IntPtr accountId, IntPtr remoteDir, int withCovers);
 
-        /// <summary>
-        /// Trigger a sync run with managed strings. Returns a JSON summary
-        /// or "error:…". Never throws on FFI load failure (Linux dev box tolerated).
-        /// </summary>
-        public static string WithNativeSyncTrigger(
-            string webdavUrl, string webdavUser, string webdavPass, string remoteDir)
+        // Native: wdmm_sync_audit_music/manga(account_id, remote_dir) → JSON {missing,orphans,healthy,summary}
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern FfiString wdmm_sync_audit_music(IntPtr accountId, IntPtr remoteDir);
+
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern FfiString wdmm_sync_audit_manga(IntPtr accountId, IntPtr remoteDir);
+
+        // Native: wdmm_sync_estimate_music/manga(account_id, remote_dir, per_shard) → JSON {shards,estimated_bytes,…}
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern FfiString wdmm_sync_estimate_music(IntPtr accountId, IntPtr remoteDir, int tracksPerShard);
+
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern FfiString wdmm_sync_estimate_manga(IntPtr accountId, IntPtr remoteDir, int mangasPerShard);
+
+        // Native: wdmm_sync_tidy_orphans_music/manga(account_id, remote_dir, orphans_json) → decimal count string
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern FfiString wdmm_sync_tidy_orphans_music(IntPtr accountId, IntPtr remoteDir, IntPtr orphansJson);
+
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern FfiString wdmm_sync_tidy_orphans_manga(IntPtr accountId, IntPtr remoteDir, IntPtr orphansJson);
+
+        // ── Sync managed wrappers ─────────────────────────────────────────────
+
+        private static IntPtr ToUtf8Ptr(string s, out byte[] buf)
         {
-            var b1 = System.Text.Encoding.UTF8.GetBytes(webdavUrl + '\0');
-            var b2 = System.Text.Encoding.UTF8.GetBytes(webdavUser + '\0');
-            var b3 = System.Text.Encoding.UTF8.GetBytes(webdavPass + '\0');
-            var b4 = System.Text.Encoding.UTF8.GetBytes(remoteDir + '\0');
-            var p1 = Marshal.AllocHGlobal(b1.Length);
-            var p2 = Marshal.AllocHGlobal(b2.Length);
-            var p3 = Marshal.AllocHGlobal(b3.Length);
-            var p4 = Marshal.AllocHGlobal(b4.Length);
-            try
-            {
-                Marshal.Copy(b1, 0, p1, b1.Length);
-                Marshal.Copy(b2, 0, p2, b2.Length);
-                Marshal.Copy(b3, 0, p3, b3.Length);
-                Marshal.Copy(b4, 0, p4, b4.Length);
-                return wdmm_sync_trigger(p1, p2, p3, p4).ToStringAndFree();
-            }
-            finally
-            {
-                Marshal.FreeHGlobal(p1);
-                Marshal.FreeHGlobal(p2);
-                Marshal.FreeHGlobal(p3);
-                Marshal.FreeHGlobal(p4);
-            }
+            buf = System.Text.Encoding.UTF8.GetBytes(s + '\0');
+            var p = Marshal.AllocHGlobal(buf.Length);
+            Marshal.Copy(buf, 0, p, buf.Length);
+            return p;
         }
 
-        /// <summary>
-        /// Trigger a full rebuild sync run with managed strings. Returns a JSON summary
-        /// or "error:…". Never throws on FFI load failure (Linux dev box tolerated).
-        /// </summary>
-        public static string WithNativeSyncFull(
-            string webdavUrl, string webdavUser, string webdavPass, string remoteDir,
-            bool withCovers = false)
+        /// <summary>Incremental sync via account_id. Returns JSON summary or "error:…".</summary>
+        public static string WithNativeSyncTrigger(string accountId, string remoteDir)
         {
-            var b1 = System.Text.Encoding.UTF8.GetBytes(webdavUrl + '\0');
-            var b2 = System.Text.Encoding.UTF8.GetBytes(webdavUser + '\0');
-            var b3 = System.Text.Encoding.UTF8.GetBytes(webdavPass + '\0');
-            var b4 = System.Text.Encoding.UTF8.GetBytes(remoteDir + '\0');
-            var p1 = Marshal.AllocHGlobal(b1.Length);
-            var p2 = Marshal.AllocHGlobal(b2.Length);
-            var p3 = Marshal.AllocHGlobal(b3.Length);
-            var p4 = Marshal.AllocHGlobal(b4.Length);
-            try
-            {
-                Marshal.Copy(b1, 0, p1, b1.Length);
-                Marshal.Copy(b2, 0, p2, b2.Length);
-                Marshal.Copy(b3, 0, p3, b3.Length);
-                Marshal.Copy(b4, 0, p4, b4.Length);
-                return wdmm_sync_full(p1, p2, p3, p4, withCovers ? 1 : 0).ToStringAndFree();
-            }
-            finally
-            {
-                Marshal.FreeHGlobal(p1);
-                Marshal.FreeHGlobal(p2);
-                Marshal.FreeHGlobal(p3);
-                Marshal.FreeHGlobal(p4);
-            }
+            var p1 = ToUtf8Ptr(accountId, out _);
+            var p2 = ToUtf8Ptr(remoteDir, out _);
+            try { return wdmm_sync_trigger(p1, p2).ToStringAndFree(); }
+            finally { Marshal.FreeHGlobal(p1); Marshal.FreeHGlobal(p2); }
+        }
+
+        /// <summary>Full-rebuild sync via account_id. Returns JSON summary or "error:…".</summary>
+        public static string WithNativeSyncFull(string accountId, string remoteDir, bool withCovers = false)
+        {
+            var p1 = ToUtf8Ptr(accountId, out _);
+            var p2 = ToUtf8Ptr(remoteDir, out _);
+            try { return wdmm_sync_full(p1, p2, withCovers ? 1 : 0).ToStringAndFree(); }
+            finally { Marshal.FreeHGlobal(p1); Marshal.FreeHGlobal(p2); }
+        }
+
+        /// <summary>Music sync audit. Returns JSON {missing,orphans,healthy,summary} or "error:…".</summary>
+        public static string WithNativeSyncAuditMusic(string accountId, string remoteDir)
+        {
+            var p1 = ToUtf8Ptr(accountId, out _);
+            var p2 = ToUtf8Ptr(remoteDir, out _);
+            try { return wdmm_sync_audit_music(p1, p2).ToStringAndFree(); }
+            finally { Marshal.FreeHGlobal(p1); Marshal.FreeHGlobal(p2); }
+        }
+
+        /// <summary>Manga sync audit. Returns JSON {missing,orphans,healthy,summary} or "error:…".</summary>
+        public static string WithNativeSyncAuditManga(string accountId, string remoteDir)
+        {
+            var p1 = ToUtf8Ptr(accountId, out _);
+            var p2 = ToUtf8Ptr(remoteDir, out _);
+            try { return wdmm_sync_audit_manga(p1, p2).ToStringAndFree(); }
+            finally { Marshal.FreeHGlobal(p1); Marshal.FreeHGlobal(p2); }
+        }
+
+        /// <summary>Music rebuild estimate. Returns JSON {shards,estimated_bytes,…} or "error:…".</summary>
+        public static string WithNativeSyncEstimateMusic(string accountId, string remoteDir, int tracksPerShard = 0)
+        {
+            var p1 = ToUtf8Ptr(accountId, out _);
+            var p2 = ToUtf8Ptr(remoteDir, out _);
+            try { return wdmm_sync_estimate_music(p1, p2, tracksPerShard).ToStringAndFree(); }
+            finally { Marshal.FreeHGlobal(p1); Marshal.FreeHGlobal(p2); }
+        }
+
+        /// <summary>Manga rebuild estimate. Returns JSON {shards,estimated_bytes,…} or "error:…".</summary>
+        public static string WithNativeSyncEstimateManga(string accountId, string remoteDir, int mangasPerShard = 0)
+        {
+            var p1 = ToUtf8Ptr(accountId, out _);
+            var p2 = ToUtf8Ptr(remoteDir, out _);
+            try { return wdmm_sync_estimate_manga(p1, p2, mangasPerShard).ToStringAndFree(); }
+            finally { Marshal.FreeHGlobal(p1); Marshal.FreeHGlobal(p2); }
+        }
+
+        /// <summary>Delete music orphan shards. Returns decimal deleted count or "error:…".</summary>
+        public static string WithNativeSyncTidyOrphansMusic(string accountId, string remoteDir, string orphansJson)
+        {
+            var p1 = ToUtf8Ptr(accountId, out _);
+            var p2 = ToUtf8Ptr(remoteDir, out _);
+            var p3 = ToUtf8Ptr(orphansJson, out _);
+            try { return wdmm_sync_tidy_orphans_music(p1, p2, p3).ToStringAndFree(); }
+            finally { Marshal.FreeHGlobal(p1); Marshal.FreeHGlobal(p2); Marshal.FreeHGlobal(p3); }
+        }
+
+        /// <summary>Delete manga orphan shards. Returns decimal deleted count or "error:…".</summary>
+        public static string WithNativeSyncTidyOrphansManga(string accountId, string remoteDir, string orphansJson)
+        {
+            var p1 = ToUtf8Ptr(accountId, out _);
+            var p2 = ToUtf8Ptr(remoteDir, out _);
+            var p3 = ToUtf8Ptr(orphansJson, out _);
+            try { return wdmm_sync_tidy_orphans_manga(p1, p2, p3).ToStringAndFree(); }
+            finally { Marshal.FreeHGlobal(p1); Marshal.FreeHGlobal(p2); Marshal.FreeHGlobal(p3); }
         }
 
 
