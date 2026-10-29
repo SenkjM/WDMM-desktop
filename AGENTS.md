@@ -5,12 +5,13 @@
 WDMM-desktop is the WinUI 3 (C#) GUI layer for WDMM. It couples to WDMM-core via
 source-level FFI (csbindgen / P-Invoke). OpenAPI is optional (settings toggle).
 
-## CloudDriver is the single authority for cloud file ops
+## WDMM-VFS is the single authority for cloud file ops
 
-All in-app cloud file operations go through **`CloudDriver`** in WDMM-core. This
-is the "virtual file layer" in product language — there is no second trait.
+All in-app cloud file operations go through **`WdmmVfs`** in WDMM-core (product name
+**WDMM-VFS** — formerly `CloudDriver`). This is the "virtual file layer" in product
+language — there is no second trait.
 
-- Sync, backup, browse: call `CloudDriver` via FFI (`wdmm_sync_trigger`,
+- Sync, backup, browse: call `WdmmVfs` via FFI (`wdmm_sync_trigger`,
   `wdmm_sync_full`, `wdmm_backup_*`, etc.). Never reach past it into raw HTTP.
 - **Do not** introduce a `VirtualFs`, `ObjectFs`, or duplicate file-access layer.
 - Sync FFI takes `account_id + remote_dir (+ with_covers)` — never `url/user/pass`.
