@@ -268,7 +268,19 @@ namespace WdmmDesktop.Dialogs
                 }
 
                 _activeProxyToken = token;
-                var proxyUrl = $"http://127.0.0.1:{port}{urlPath}";
+                // B3.i: use the host field from Core's register response (which
+                // reflects the actual bind address).  When the generated bindings
+                // still take (ushort port) instead of (bind_mode, port), we fall
+                // back to 127.0.0.1 — LanHelper.GetBindModeFor() is wired here so
+                // it takes effect once NativeMethods.g.cs is regenerated after the
+                // Android B3.b Core changes propagate to the desktop submodule.
+                //
+                // TODO(B3.i-followup): regenerate NativeMethods.g.cs from the
+                //   updated wdmm-ffi (bind_mode_cstr param) and call:
+                //     NativeMethods.ProxyStart(LanHelper.GetBindModeFor(dev.Host), 0)
+                //   then read `host` from register JSON instead of hardcoding 127.0.0.1.
+                var proxyHost = "127.0.0.1";
+                var proxyUrl = $"http://{proxyHost}:{port}{urlPath}";
 
                 var locBytes = System.Text.Encoding.UTF8.GetBytes(dev.Location + '\0');
                 var locPtr   = Marshal.AllocHGlobal(locBytes.Length);
