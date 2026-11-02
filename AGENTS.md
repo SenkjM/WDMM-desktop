@@ -21,15 +21,42 @@ language — there is no second trait.
 ## FFI coupling
 
 - Native bindings: `WdmmDesktop/Generated/NativeMethods.g.cs` (csbindgen output).
-- Submodule: `rust/wdmm-core` — always bump to the target Core SHA in the same commit that updates callers.
-- Build: `dotnet build WdmmDesktop.sln`
+- Submodule: `rust/wdmm-core` — always bump to the target Core SHA in the same commit
+  that updates callers.
+- Build Rust FFI: `cargo build --release --package wdmm-ffi` (inside `rust/wdmm-core`).
+- Generate C# bindings: `csbindgen --input target/release/wdmm_ffi.dll --output WdmmDesktop/Generated/NativeMethods.g.cs`
+
+## Build and test
+
+```bash
+# Build the solution
+dotnet build WdmmDesktop.sln
+
+# Run tests (if a test project is added)
+dotnet test WdmmDesktop.sln
+```
+
+Smoke-test checklist after build: project opens in Visual Studio 2022, solution builds
+(`Ctrl+Shift+B`), window launches without crash, settings UI renders.
+
+## Branch and commit conventions
+
+- Active branch: `refactor/rust-core`
+- Commit prefixes: `feat:`, `fix:`, `refactor:`, `docs:`, `test:`, `chore:`
+- Do not commit to `main` directly. No force-push. No triggering CI via API.
+- Submodule bump rule: pin `rust/wdmm-core` to the target Core SHA in the same commit
+  that updates C# callers.
+
+## CI workflows
+
+`.github/workflows/testbuild.yml` — full solution build check (no signing) on push/PR.
+
+## Where docs live
+
+- Rust Core API and constraint notes: `rust/wdmm-core/crates/*/docs/API.md` (via submodule)
+- Agent instructions: this file (`AGENTS.md`)
 
 ## One-shot coding rule (mandatory)
 
 Finish the new authority completely, then delete the old path and wire callers. No
 feature flags, no dual-write/dual-read, no soft fallbacks. See `CLAUDE.md`.
-
-## Verification
-
-After any FFI update: build solution and confirm no C# compiler errors.
-`dotnet build WdmmDesktop.sln`

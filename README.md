@@ -2,7 +2,7 @@
 
 **WebDAV Media Manager** Windows GUI using **WinUI 3** (Windows App SDK 1.6). Communicates with [WDMM-core](https://github.com/SenkjM/WDMM-core) Rust logic via **csbindgen-generated P/Invoke bindings** (primary path) or optional OpenAPI (localhost).
 
-**Smoke-test target**: project opens in Visual Studio 2022, window launches without crash, settings UI renders. Full feature parity with Android is not required (per `saf_work/wdmm-split-impl-brief.md §B`).
+**Smoke-test target**: project opens in Visual Studio 2022, window launches without crash, settings UI renders.
 
 ---
 
@@ -228,8 +228,7 @@ If Rust cross-compile to `x86_64-pc-windows-msvc` isn't available in your enviro
 ## References
 
 - **Rust Core**: [WDMM-core](https://github.com/SenkjM/WDMM-core)
-- **Constraints**: `rust/wdmm-core/docs/CONSTRAINTS.md`
-- **Brief**: `/workspace/saf_work/wdmm-split-impl-brief.md §B`
+- **Agent instructions / Core API**: `rust/wdmm-core/AGENTS.md` (via submodule)
 - **csbindgen**: https://github.com/Cysharp/csbindgen
 - **Windows App SDK Docs**: https://learn.microsoft.com/windows/apps/windows-app-sdk/
 
